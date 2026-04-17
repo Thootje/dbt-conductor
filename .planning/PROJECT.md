@@ -16,9 +16,9 @@ A dbt DAG where every model is a first-class Airflow task, with cross-DAG freshn
 
 ### Active
 
-- [ ] Operator compiles dbt manifest via `dbt compile` at DAG parse time
-- [ ] Operator resolves model graph from a full `dbt build/run --select ...` command using dbt selector syntax
-- [ ] Each resolved model becomes a separate Airflow task via dynamic task mapping
+- [ ] Operator accepts a pre-built `manifest.json` path (recommended production pattern) OR compiles via `dbt parse` at DAG parse time (development opt-in only)
+- [ ] Operator resolves model graph from a full `dbt build/run --select ...` command using dbt selector syntax (delegated to `dbt ls` subprocess)
+- [ ] Each resolved model becomes a separate statically-generated Airflow task at parse time (Python loop, not Airflow `.expand()` — preserves per-model graph wiring and lineage)
 - [ ] Task dependencies mirror the dbt model DAG (upstream/downstream wiring)
 - [ ] dbt models execute via CLI subprocess (`dbt run --select model_name`)
 - [ ] Credentials supplied via `profiles.yml` on disk
@@ -57,9 +57,9 @@ A dbt DAG where every model is a first-class Airflow task, with cross-DAG freshn
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Dynamic task mapping (one task per model) | Enables native Airflow lineage visualization and per-model retry/monitoring | — Pending |
+| Static task generation at parse time (one task per model, Python loop not `.expand()`) | `.expand()` collapses all model tasks into one Graph node, destroying lineage; static loop preserves per-model wiring | — Pending |
 | CLI subprocess execution | Stable across dbt versions; dbt Python API changes between minor versions | — Pending |
-| Airflow metadata DB for state/locking | No extra infra; transactional row-level locking handles concurrent DAG conflicts | — Pending |
+| Airflow metadata DB for state/locking via dedicated hook | No extra infra; Postgres advisory locks handle concurrent DAG conflicts; hook abstraction required for Airflow 3 worker isolation | — Pending |
 | profiles.yml on disk for credentials | Simplest path; Airflow connection abstraction deferred | — Pending |
 | BigQuery-only at launch | Focus on target deployment; other adapters added in future milestones | — Pending |
 
@@ -81,4 +81,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-17 after initialization*
+*Last updated: 2026-04-17 after research — manifest-as-input clarified, static task generation vs .expand() resolved, locking approach updated*
