@@ -87,38 +87,39 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CORE-01 | Phase 1 | Pending |
-| CORE-02 | Phase 1 | Pending |
-| CORE-03 | Phase 1 | Pending |
-| CORE-04 | Phase 1 | Pending |
-| CORE-05 | Phase 1 | Pending |
-| CORE-06 | Phase 1 | Pending |
-| CORE-07 | Phase 1 | Pending |
-| CORE-08 | Phase 1 | Pending |
-| CORE-09 | Phase 1 | Pending |
-| EXEC-01 | Phase 2 | Pending |
-| EXEC-02 | Phase 2 | Pending |
-| EXEC-03 | Phase 2 | Pending |
-| FRESH-01 | Phase 3 | Pending |
-| FRESH-02 | Phase 3 | Pending |
-| FRESH-03 | Phase 3 | Pending |
-| FRESH-04 | Phase 3 | Pending |
-| FRESH-05 | Phase 3 | Pending |
-| FRESH-06 | Phase 3 | Pending |
-| LOCK-01 | Phase 4 | Pending |
-| LOCK-02 | Phase 4 | Pending |
-| LOCK-03 | Phase 4 | Pending |
-| LOCK-04 | Phase 4 | Pending |
-| LOCK-05 | Phase 4 | Pending |
-| CLOUD-01 | Phase 5 | Pending |
-| CLOUD-02 | Phase 5 | Pending |
-| CLOUD-03 | Phase 5 | Pending |
+| CORE-01 | Phase 1: Walking Skeleton | Pending |
+| CORE-02 | Phase 1: Walking Skeleton | Pending |
+| CORE-03 | Phase 1: Walking Skeleton | Pending |
+| CORE-04 | Phase 1: Walking Skeleton | Pending |
+| CORE-05 | Phase 1: Walking Skeleton | Pending |
+| CORE-06 | Phase 1: Walking Skeleton | Pending |
+| CORE-07 | Phase 1: Walking Skeleton | Pending |
+| CORE-08 | Phase 1: Walking Skeleton | Pending |
+| CORE-09 | Phase 1: Walking Skeleton | Pending |
+| EXEC-01 | Phase 2: Execution Hardening | Pending |
+| EXEC-02 | Phase 2: Execution Hardening | Pending |
+| EXEC-03 | Phase 2: Execution Hardening | Pending |
+| FRESH-01 | Phase 3: Freshness Policies | Pending |
+| FRESH-02 | Phase 3: Freshness Policies | Pending |
+| FRESH-03 | Phase 3: Freshness Policies | Pending |
+| FRESH-04 | Phase 3: Freshness Policies | Pending |
+| FRESH-05 | Phase 3: Freshness Policies | Pending |
+| FRESH-06 | Phase 3: Freshness Policies | Pending |
+| LOCK-01 | Phase 4: Cross-DAG Conflict Locking | Pending |
+| LOCK-02 | Phase 4: Cross-DAG Conflict Locking | Pending |
+| LOCK-03 | Phase 4: Cross-DAG Conflict Locking | Pending |
+| LOCK-04 | Phase 4: Cross-DAG Conflict Locking | Pending |
+| LOCK-05 | Phase 4: Cross-DAG Conflict Locking | Pending |
+| CLOUD-01 | Phase 5: Cloud Run + Distribution | Pending |
+| CLOUD-02 | Phase 5: Cloud Run + Distribution | Pending |
+| CLOUD-03 | Phase 5: Cloud Run + Distribution | Pending |
 
 **Coverage:**
 - v1 requirements: 26 total
 - Mapped to phases: 26
 - Unmapped: 0 ✓
+- Duplicates: 0 ✓
 
 ---
 *Requirements defined: 2026-04-17*
-*Last updated: 2026-04-17 after initial definition*
+*Last updated: 2026-04-17 after roadmap creation — traceability phase names reconciled with ROADMAP.md*
