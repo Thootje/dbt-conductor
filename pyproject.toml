@@ -1,0 +1,65 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "airflow-provider-aircontroler"
+version = "0.1.0"
+description = "Map each dbt model to a native Airflow task with accurate upstream/downstream wiring."
+readme = "README.md"
+requires-python = ">=3.10,<3.14"
+license = {text = "Apache-2.0"}
+keywords = ["airflow", "dbt", "provider", "dag"]
+classifiers = [
+    "Framework :: Apache Airflow",
+    "Framework :: Apache Airflow :: Provider",
+]
+dependencies = [
+    "apache-airflow>=2.10.0,<4.0",
+    "apache-airflow-providers-common-compat>=1.7.0",
+    "dbt-core>=1.8.0,<1.12",
+    "pyyaml>=6.0",
+    "packaging>=23.0",
+]
+
+[project.optional-dependencies]
+bigquery = ["dbt-bigquery>=1.8.0,<1.12"]
+fast-parse = ["orjson>=3.10"]
+dev = [
+    "ruff>=0.7",
+    "mypy>=1.13",
+]
+test = [
+    "dbt-duckdb>=1.8.0",
+    "pytest>=8.0",
+    "pytest-mock>=3.14",
+    "pytest-cov>=5.0",
+    "ruff>=0.7",
+    "mypy>=1.13",
+]
+
+[project.entry-points."apache_airflow_provider"]
+provider_info = "aircontroler:get_provider_info"
+
+[tool.hatch.build.targets.wheel]
+packages = ["aircontroler"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --tb=short"
+markers = [
+    "integration: marks tests that require dbt-duckdb and subprocess execution",
+    "unit: marks tests that use mocks and fixtures only",
+]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "AIR301", "AIR302"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = false
+ignore_missing_imports = true
