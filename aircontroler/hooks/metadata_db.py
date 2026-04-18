@@ -6,7 +6,7 @@ Extends BaseHook so Airflow 3 worker isolation is respected from day one
 """
 from __future__ import annotations
 
-from airflow.providers.common.compat.sdk import BaseHook
+from airflow.hooks.base import BaseHook
 
 
 class MetadataDBHook(BaseHook):

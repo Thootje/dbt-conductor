@@ -6,7 +6,7 @@ import pytest
 def test_import_compat():
     """CORE-08: DbtRunModelOperator uses BaseOperator from common-compat shim."""
     from aircontroler.operator import DbtRunModelOperator
-    from airflow.providers.common.compat.sdk import BaseOperator
+    from airflow.models import BaseOperator
     assert issubclass(DbtRunModelOperator, BaseOperator)
 
 
@@ -64,7 +64,7 @@ def test_custom_executable(mocker):
 def test_failure_raises(mocker):
     """CORE-06: Non-zero dbt exit code raises AirflowException with unique_id and code."""
     from aircontroler.operator import DbtRunModelOperator
-    from airflow.providers.common.compat.sdk import AirflowException
+    from airflow.exceptions import AirflowException
     mock_run = mocker.patch("aircontroler.operator.subprocess.run")
     mock_run.return_value = mocker.MagicMock(
         returncode=1,

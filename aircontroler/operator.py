@@ -12,7 +12,8 @@ from __future__ import annotations
 
 import subprocess
 
-from airflow.providers.common.compat.sdk import AirflowException, BaseOperator
+from airflow.exceptions import AirflowException
+from airflow.providers.common.compat.sdk import BaseOperator
 
 
 class DbtRunModelOperator(BaseOperator):

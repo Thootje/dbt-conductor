@@ -27,5 +27,8 @@ target/
 logs/
 .user.yml
 
+# Planning docs (internal)
+.planning/
+
 # uv lock file (managed separately)
 # uv.lock is intentionally tracked for reproducible CI
