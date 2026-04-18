@@ -73,10 +73,13 @@ class DbtRunModelOperator(BaseOperator):
             cmd,
             capture_output=True,
             text=True,
+            check=False,
         )
         self.log.info(result.stdout)
         if result.returncode != 0:
-            self.log.error(result.stderr)
+            if result.stdout:
+                self.log.error("dbt stdout:\n%s", result.stdout)
+            self.log.error("dbt stderr:\n%s", result.stderr)
             raise AirflowException(
                 f"dbt build failed for {self.unique_id!r} "
                 f"(exit {result.returncode})"

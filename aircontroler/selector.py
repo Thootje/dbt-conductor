@@ -17,7 +17,7 @@ log = logging.getLogger(__name__)
 # Regex patterns to extract selector flags from a dbt command string (D-04).
 # Each flag is extracted independently. --models is the legacy alias for --select.
 _SELECTOR_FLAGS: dict[str, re.Pattern] = {
-    "--select": re.compile(r"(?:--select|-s)\s+(\S+)"),
+    "--select": re.compile(r"--select\s+(\S+)"),
     "--exclude": re.compile(r"--exclude\s+(\S+)"),
     "--selector": re.compile(r"--selector\s+(\S+)"),
     "--models": re.compile(r"--models\s+(\S+)"),  # legacy alias; still works in 1.8-1.11
@@ -84,8 +84,7 @@ class SelectorResolver:
         """
         args: list[str] = []
         for flag, pattern in _SELECTOR_FLAGS.items():
-            match = pattern.search(dbt_command)
-            if match:
+            for match in pattern.finditer(dbt_command):
                 args.extend([flag, match.group(1)])
         return args
 

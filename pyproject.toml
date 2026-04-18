@@ -15,7 +15,7 @@ classifiers = [
     "Framework :: Apache Airflow :: Provider",
 ]
 dependencies = [
-    "apache-airflow>=2.10.0,<4.0",
+    "apache-airflow>=2.7.0,<4.0",
     "apache-airflow-providers-common-compat>=1.7.0",
     "dbt-core>=1.8.0,<1.12",
     "pyyaml>=6.0",
