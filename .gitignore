@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.egg
+dist/
+build/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Test artifacts
+.coverage
+.pytest_cache/
+htmlcov/
+coverage.xml
+
+# dbt generated output (fixture project and any local runs)
+tests/fixtures/dbt_project/target/
+tests/fixtures/dbt_project/logs/
+tests/fixtures/dbt_project/.user.yml
+tests/fixtures/dbt_project/partial_parse.msgpack
+target/
+logs/
+.user.yml
+
+# uv lock file (managed separately)
+# uv.lock is intentionally tracked for reproducible CI
