@@ -1,0 +1,148 @@
+"""Manifest loading and version dispatch for aircontroler.
+
+Supports dbt manifest schema v11 (dbt 1.7.x) and v12 (dbt 1.8.x+).
+Never hardcodes field paths — reads manifest_version first and dispatches.
+"""
+from __future__ import annotations
+
+import json
+import logging
+import os
+import subprocess
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
+
+log = logging.getLogger(__name__)
+
+_MODEL_RESOURCE_TYPES = frozenset({"model", "seed", "snapshot"})
+_NODE_PREFIX_WHITELIST = ("model.", "seed.", "snapshot.")
+
+
+@dataclass
+class ManifestNode:
+    """Internal representation of a dbt node.
+
+    Both v11 and v12 parsers return this shape (D-08).
+    """
+
+    unique_id: str
+    name: str
+    resource_type: str        # "model" | "seed" | "snapshot"
+    depends_on: list[str]     # unique_ids filtered to model/seed/snapshot prefixes
+    fqn: list[str]
+    tags: list[str]
+    original_file_path: str
+    config: dict[str, Any] = field(default_factory=dict)
+
+
+def parse_manifest(path: str) -> list[ManifestNode]:
+    """Read manifest.json at path, dispatch on version, return ManifestNode list.
+
+    Raises:
+        FileNotFoundError: if path does not exist.
+        ValueError: if manifest schema version is not v11 or v12.
+
+    Logs the resolved absolute path at INFO level (never logs file contents).
+    """
+    abs_path = os.path.abspath(path)
+    log.info("Loading manifest from: %s", abs_path)
+    # Raises FileNotFoundError / OSError if path is missing — desired behavior (T-01-02-01)
+    with open(abs_path) as fh:
+        data = json.load(fh)
+    return _dispatch(data)
+
+
+def _dispatch(data: dict) -> list[ManifestNode]:
+    """Dispatch to the correct version-specific parser (D-09)."""
+    version_url: str = data.get("metadata", {}).get("dbt_schema_version", "")
+    if "v11" in version_url:
+        return _parse_nodes(data)
+    elif "v12" in version_url:
+        return _parse_nodes(data)
+    else:
+        raise ValueError(
+            f"Unsupported manifest schema version: {version_url!r}. "
+            "Expected v11 or v12."
+        )
+
+
+def _parse_nodes(data: dict) -> list[ManifestNode]:
+    """Extract ManifestNode list from the nodes dict (shared v11/v12 logic)."""
+    result: list[ManifestNode] = []
+    for uid, node in data.get("nodes", {}).items():
+        if node.get("resource_type") not in _MODEL_RESOURCE_TYPES:
+            continue
+        raw_deps = node.get("depends_on", {}).get("nodes", [])
+        filtered_deps = [
+            n for n in raw_deps
+            if n.startswith(_NODE_PREFIX_WHITELIST)
+        ]
+        result.append(ManifestNode(
+            unique_id=node["unique_id"],
+            name=node["name"],
+            resource_type=node["resource_type"],
+            depends_on=filtered_deps,
+            fqn=node.get("fqn", []),
+            tags=node.get("tags", []),
+            original_file_path=node.get("original_file_path", ""),
+            config=node.get("config", {}),
+        ))
+    return result
+
+
+class ManifestLoader:
+    """High-level manifest loader supporting both pre-built and compile-on-parse modes.
+
+    compile=False (default): reads manifest_path directly.
+    compile=True (CORE-02, dev opt-in): runs 'dbt parse' then reads
+        {project_dir}/target/manifest.json.
+
+    Never calls dbt parse as the default — prevents 50-100s scheduler stalls (CLAUDE.md pitfall 1).
+    """
+
+    def load(
+        self,
+        manifest_path: str | None = None,
+        project_dir: str | None = None,
+        profiles_dir: str | None = None,
+        compile: bool = False,
+        dbt_executable: str = "dbt",
+    ) -> list[ManifestNode]:
+        """Load manifest nodes.
+
+        If compile=True, run 'dbt parse' first then read
+        {project_dir}/target/manifest.json. If compile=False, read manifest_path directly.
+        """
+        if compile:
+            if not project_dir:
+                raise ValueError("project_dir is required when compile=True")
+            if not profiles_dir:
+                raise ValueError("profiles_dir is required when compile=True")
+            self._run_dbt_parse(dbt_executable, project_dir, profiles_dir)
+            effective_path = str(Path(project_dir) / "target" / "manifest.json")
+        else:
+            if not manifest_path:
+                raise ValueError("manifest_path is required when compile=False")
+            effective_path = manifest_path
+        return parse_manifest(effective_path)
+
+    def _run_dbt_parse(
+        self,
+        dbt_executable: str,
+        project_dir: str,
+        profiles_dir: str,
+    ) -> None:
+        """Run dbt parse to generate manifest.json. Command MUST be list[str]; no shell passthrough."""
+        cmd = [
+            dbt_executable,
+            "parse",
+            "--project-dir", project_dir,
+            "--profiles-dir", profiles_dir,
+        ]
+        log.info("Running dbt parse: %s", " ".join(cmd))
+        result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+        if result.returncode != 0:
+            raise RuntimeError(
+                f"dbt parse failed (exit {result.returncode}): {result.stderr}"
+            )
