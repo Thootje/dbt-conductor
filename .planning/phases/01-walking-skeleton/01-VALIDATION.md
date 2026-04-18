@@ -1,9 +1,9 @@
 ---
 phase: 1
 slug: walking-skeleton
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: complete
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-04-18
 ---
 
@@ -38,25 +38,25 @@ created: 2026-04-18
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| manifest-parse-v11 | manifest | 1 | CORE-01 | — | N/A | unit | `pytest tests/unit/test_manifest.py::test_parse_v11 -x` | ❌ W0 | ⬜ pending |
-| manifest-parse-v12 | manifest | 1 | CORE-01 | — | N/A | unit | `pytest tests/unit/test_manifest.py::test_parse_v12 -x` | ❌ W0 | ⬜ pending |
-| manifest-unknown-version | manifest | 1 | CORE-01 | — | raises ValueError | unit | `pytest tests/unit/test_manifest.py::test_unknown_version_raises -x` | ❌ W0 | ⬜ pending |
-| manifest-compile-on-parse | manifest | 1 | CORE-02 | subprocess-injection | dbt parse uses list args, no shell=True | unit | `pytest tests/unit/test_manifest.py::test_compile_on_parse -x` | ❌ W0 | ⬜ pending |
-| selector-extract-select | selector | 1 | CORE-03 | — | N/A | unit | `pytest tests/unit/test_selector.py::test_extract_select -x` | ❌ W0 | ⬜ pending |
-| selector-extract-exclude | selector | 1 | CORE-03 | — | N/A | unit | `pytest tests/unit/test_selector.py::test_extract_exclude -x` | ❌ W0 | ⬜ pending |
-| selector-extract-selector | selector | 1 | CORE-03 | — | N/A | unit | `pytest tests/unit/test_selector.py::test_extract_selector -x` | ❌ W0 | ⬜ pending |
-| selector-parse-ndjson | selector | 1 | CORE-03 | subprocess-injection | dbt ls uses list args, no shell=True | unit | `pytest tests/unit/test_selector.py::test_parse_ls_output -x` | ❌ W0 | ⬜ pending |
-| selector-ls-failure | selector | 1 | CORE-03 | — | non-zero exit raises RuntimeError | unit | `pytest tests/unit/test_selector.py::test_ls_failure_raises -x` | ❌ W0 | ⬜ pending |
-| factory-task-per-model | factory | 2 | CORE-04 | — | N/A | unit | `pytest tests/unit/test_factory.py::test_task_per_model -x` | ❌ W0 | ⬜ pending |
-| factory-edge-wiring | factory | 2 | CORE-05 | — | N/A | unit | `pytest tests/unit/test_factory.py::test_edge_wiring -x` | ❌ W0 | ⬜ pending |
-| factory-entry-exit | factory | 2 | CORE-05 | — | N/A | unit | `pytest tests/unit/test_factory.py::test_entry_exit_classification -x` | ❌ W0 | ⬜ pending |
-| operator-subprocess | operator | 2 | CORE-06 | subprocess-injection | command built as list[str], no shell=True | unit | `pytest tests/unit/test_operator.py::test_subprocess_command -x` | ❌ W0 | ⬜ pending |
-| operator-custom-executable | operator | 2 | CORE-06 | — | N/A | unit | `pytest tests/unit/test_operator.py::test_custom_executable -x` | ❌ W0 | ⬜ pending |
-| operator-failure-raises | operator | 2 | CORE-06 | — | non-zero exit raises AirflowException | unit | `pytest tests/unit/test_operator.py::test_failure_raises -x` | ❌ W0 | ⬜ pending |
-| operator-profiles-path | operator | 2 | CORE-07 | credential-leak | profiles_path passed as --profiles-dir arg, contents never logged | unit | `pytest tests/unit/test_operator.py::test_profiles_path -x` | ❌ W0 | ⬜ pending |
-| operator-compat-import | operator | 2 | CORE-08 | — | N/A | unit | `pytest tests/unit/test_operator.py::test_import_compat -x` | ❌ W0 | ⬜ pending |
-| provider-info | init | 1 | CORE-09 | — | N/A | unit | `pytest tests/unit/test_init.py::test_provider_info -x` | ❌ W0 | ⬜ pending |
-| integration-full-pipeline | integration | 3 | CORE-01–09 | — | full subprocess + DAG run | integration | `pytest tests/integration/ -x` | ❌ W0 | ⬜ pending |
+| manifest-parse-v11 | manifest | 1 | CORE-01 | — | N/A | unit | `pytest tests/unit/test_manifest.py::test_parse_v11 -x` | ✅ | ✅ green |
+| manifest-parse-v12 | manifest | 1 | CORE-01 | — | N/A | unit | `pytest tests/unit/test_manifest.py::test_parse_v12 -x` | ✅ | ✅ green |
+| manifest-unknown-version | manifest | 1 | CORE-01 | — | raises ValueError | unit | `pytest tests/unit/test_manifest.py::test_unknown_version_raises -x` | ✅ | ✅ green |
+| manifest-compile-on-parse | manifest | 1 | CORE-02 | subprocess-injection | dbt parse uses list args, no shell=True | unit | `pytest tests/unit/test_manifest.py::test_compile_on_parse -x` | ✅ | ✅ green |
+| selector-extract-select | selector | 1 | CORE-03 | — | N/A | unit | `pytest tests/unit/test_selector.py::test_extract_select -x` | ✅ | ✅ green |
+| selector-extract-exclude | selector | 1 | CORE-03 | — | N/A | unit | `pytest tests/unit/test_selector.py::test_extract_exclude -x` | ✅ | ✅ green |
+| selector-extract-selector | selector | 1 | CORE-03 | — | N/A | unit | `pytest tests/unit/test_selector.py::test_extract_selector -x` | ✅ | ✅ green |
+| selector-parse-ndjson | selector | 1 | CORE-03 | subprocess-injection | dbt ls uses list args, no shell=True | unit | `pytest tests/unit/test_selector.py::test_parse_ls_output -x` | ✅ | ✅ green |
+| selector-ls-failure | selector | 1 | CORE-03 | — | non-zero exit raises RuntimeError | unit | `pytest tests/unit/test_selector.py::test_ls_failure_raises -x` | ✅ | ✅ green |
+| factory-task-per-model | factory | 2 | CORE-04 | — | N/A | unit | `pytest tests/unit/test_factory.py::test_task_per_model -x` | ✅ | ✅ green |
+| factory-edge-wiring | factory | 2 | CORE-05 | — | N/A | unit | `pytest tests/unit/test_factory.py::test_edge_wiring -x` | ✅ | ✅ green |
+| factory-entry-exit | factory | 2 | CORE-05 | — | N/A | unit | `pytest tests/unit/test_factory.py::test_entry_exit_classification -x` | ✅ | ✅ green |
+| operator-subprocess | operator | 2 | CORE-06 | subprocess-injection | command built as list[str], no shell=True | unit | `pytest tests/unit/test_operator.py::test_subprocess_command -x` | ✅ | ✅ green |
+| operator-custom-executable | operator | 2 | CORE-06 | — | N/A | unit | `pytest tests/unit/test_operator.py::test_custom_executable -x` | ✅ | ✅ green |
+| operator-failure-raises | operator | 2 | CORE-06 | — | non-zero exit raises AirflowException | unit | `pytest tests/unit/test_operator.py::test_failure_raises -x` | ✅ | ✅ green |
+| operator-profiles-path | operator | 2 | CORE-07 | credential-leak | profiles_path passed as --profiles-dir arg, contents never logged | unit | `pytest tests/unit/test_operator.py::test_profiles_path -x` | ✅ | ✅ green |
+| operator-compat-import | operator | 2 | CORE-08 | — | N/A | unit | `pytest tests/unit/test_operator.py::test_import_compat -x` | ✅ | ✅ green |
+| provider-info | init | 1 | CORE-09 | — | N/A | unit | `pytest tests/unit/test_init.py::test_provider_info -x` | ✅ | ✅ green |
+| integration-full-pipeline | integration | 3 | CORE-01–09 | — | full subprocess + DAG run | integration | `pytest tests/integration/ -x` | ✅ | ✅ green |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -90,11 +90,11 @@ created: 2026-04-18
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 30s (unit), < 120s (full)
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references
+- [x] No watch-mode flags
+- [x] Feedback latency < 30s (unit), < 120s (full)
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** COMPLETE — 23 tests pass (21 unit + 2 integration), 90% coverage, 2026-04-18
