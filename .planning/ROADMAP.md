@@ -15,15 +15,22 @@
 ## Milestone 1: v1.0
 
 ### Phase 1: Walking Skeleton
-**Goal:** User can render a dbt project as an Airflow DAG where every model is a separate task with dbt-accurate upstream/downstream wiring, installable from PyPI on Airflow 2.7+ or 3.x.
+**Goal:** User can render a dbt project as an Airflow DAG where every model is a separate task with dbt-accurate upstream/downstream wiring, installable from PyPI on Airflow 2.10+ or 3.x.
 **Depends on:** Nothing (first phase)
 **Requirements:** CORE-01, CORE-02, CORE-03, CORE-04, CORE-05, CORE-06, CORE-07, CORE-08, CORE-09
 **Success Criteria** (what must be TRUE):
-  1. User pip-installs `airflow-provider-aircontroler` and sees the provider registered in Airflow's Providers list on both 2.7+ and 3.x.
+  1. User pip-installs `airflow-provider-aircontroler` and sees the provider registered in Airflow's Providers list on both 2.10+ and 3.x.
   2. User passes `manifest_path=...` (or opts into compile-on-parse) plus a `dbt build --select ...` command and the resulting DAG contains one Airflow task per resolved dbt model, each `task_id` equal to the model's `unique_id`.
   3. User opens Airflow's Graph view and sees the dbt lineage graph (task edges exactly mirror upstream/downstream relationships from the manifest).
   4. A triggered DAG run executes each model task as a `dbt build --select <model>` subprocess using credentials from a user-supplied `profiles.yml`, with a configurable `dbt_executable_path`.
-**Plans:** TBD
+**Plans:** 5 plans
+
+Plans:
+- [ ] 01-01-PLAN.md — Wave 0: pyproject.toml, test stubs, JSON fixtures
+- [ ] 01-02-PLAN.md — Wave 1: manifest.py, selector.py, __init__.py, hooks stub
+- [ ] 01-03-PLAN.md — Wave 2: operator.py (DbtRunModelOperator)
+- [ ] 01-04-PLAN.md — Wave 3: factory.py (build_dbt_dag)
+- [ ] 01-05-PLAN.md — Wave 4: dbt-duckdb fixture project, integration tests
 
 ### Phase 2: Execution Hardening
 **Goal:** User gets production-grade operator ergonomics — per-model overrides, visibility into dbt execution results, and a parse-time guard rail that prevents runaway DAGs.
@@ -71,7 +78,7 @@
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Walking Skeleton | 0/0 | Not started | - |
+| 1. Walking Skeleton | 0/5 | In progress | - |
 | 2. Execution Hardening | 0/0 | Not started | - |
 | 3. Freshness Policies | 0/0 | Not started | - |
 | 4. Cross-DAG Conflict Locking | 0/0 | Not started | - |
@@ -115,4 +122,4 @@
 - Duplicates: 0 ✓
 
 ---
-*Last updated: 2026-04-17 — initial roadmap*
+*Last updated: 2026-04-18 — Phase 1 decomposed into 5 plans (waves 0-4)*
