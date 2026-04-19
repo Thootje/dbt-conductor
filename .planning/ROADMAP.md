@@ -6,7 +6,7 @@
 
 ## Phases
 
-- [ ] **Phase 1: Walking Skeleton** - User can render a dbt project as a per-model Airflow DAG running on Composer + BigQuery
+- [x] **Phase 1: Walking Skeleton** - User can render a dbt project as a per-model Airflow DAG running on Composer + BigQuery
 - [x] **Phase 2: Execution Hardening** - User gets production-grade per-task overrides, structured run results, and parse-time safety guards
 - [ ] **Phase 3: Freshness Policies** - User can define time-based TTLs that skip already-fresh models across DAGs (D1 differentiator)
 - [ ] **Phase 4: Cross-DAG Conflict Locking** - User can configure skip/fail conflict policies that prevent concurrent DAGs from double-running the same model (D2 differentiator)
@@ -51,13 +51,19 @@ Plans:
 ### Phase 3: Freshness Policies
 **Goal:** User can define time-based freshness TTLs per model so that tasks skip execution when the model was already built recently in any DAG — the first of two headline differentiators over Cosmos.
 **Depends on:** Phase 2
-**Requirements:** FRESH-01, FRESH-02, FRESH-03, FRESH-04, FRESH-05, FRESH-06
+**Requirements:** FRESH-01, FRESH-03, FRESH-04, FRESH-06 (FRESH-02 and FRESH-05 deferred per D-11)
 **Success Criteria** (what must be TRUE):
   1. User sets `meta.aircontroler.freshness_hours: N` in `schema.yml` (or overrides per-DAG in Python) and subsequent task runs within the TTL window are skipped without invoking dbt.
   2. After a successful model run, the `aircontroler_model_runs` state row is written via a dedicated hook (no direct SQLAlchemy from worker code) and is readable across DAGs.
   3. When two DAGs declare different TTLs for the same model, the longest TTL wins — verified by a cross-DAG test where DAG_A (1h) and DAG_B (6h) both observe the same skip window.
   4. On Airflow 3.x the `aircontroler_model_runs` table is created via `BaseDBManager`; on Airflow 2.x it is created via `aircontroler db init` — both paths ship an Alembic migration.
-**Plans:** TBD
+**Plans:** 4 plans
+
+Plans:
+- [ ] 03-01-PLAN.md — Wave 0: db_manager.py + Alembic migration + test fixtures & stubs (FRESH-04, FRESH-06)
+- [ ] 03-02-PLAN.md — Wave 1: MetadataDBHook full impl + operator freshness skip/record (FRESH-03, FRESH-04)
+- [ ] 03-03-PLAN.md — Wave 1: factory meta extraction + provider_info db-managers + `aircontroler db init` CLI (FRESH-01, FRESH-03, FRESH-06)
+- [ ] 03-04-PLAN.md — Wave 2: SQLite integration tests (round-trip + operator end-to-end) (FRESH-03, FRESH-04, FRESH-06)
 
 ### Phase 4: Cross-DAG Conflict Locking
 **Goal:** User can configure conflict policies so that when multiple DAGs target the same model concurrently, only one runs and the others skip or fail deterministically — the second headline differentiator over Cosmos.
@@ -86,7 +92,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 1. Walking Skeleton | 5/5 | Complete | 2026-04-18 |
 | 2. Execution Hardening | 4/4 | Complete | 2026-04-19 |
-| 3. Freshness Policies | 0/0 | Not started | - |
+| 3. Freshness Policies | 0/4 | Planned | - |
 | 4. Cross-DAG Conflict Locking | 0/0 | Not started | - |
 | 5. Cloud Run + Distribution | 0/0 | Not started | - |
 
@@ -94,25 +100,25 @@ Plans:
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CORE-01 | Phase 1 | Pending |
-| CORE-02 | Phase 1 | Pending |
-| CORE-03 | Phase 1 | Pending |
-| CORE-04 | Phase 1 | Pending |
-| CORE-05 | Phase 1 | Pending |
-| CORE-06 | Phase 1 | Pending |
-| CORE-07 | Phase 1 | Pending |
-| CORE-08 | Phase 1 | Pending |
-| CORE-09 | Phase 1 | Pending |
-| EXEC-01 | Phase 2 | Pending |
+| CORE-01 | Phase 1 | Complete |
+| CORE-02 | Phase 1 | Complete |
+| CORE-03 | Phase 1 | Complete |
+| CORE-04 | Phase 1 | Complete |
+| CORE-05 | Phase 1 | Complete |
+| CORE-06 | Phase 1 | Complete |
+| CORE-07 | Phase 1 | Complete |
+| CORE-08 | Phase 1 | Complete |
+| CORE-09 | Phase 1 | Complete |
+| EXEC-01 | Phase 2 | Complete |
 | EXEC-02 | Phase 2 | Complete |
-| EXEC-03 | Phase 2 | Pending |
-| EXEC-04 | Phase 2 | Pending |
-| FRESH-01 | Phase 3 | Pending |
-| FRESH-02 | Phase 3 | Pending |
-| FRESH-03 | Phase 3 | Pending |
-| FRESH-04 | Phase 3 | Pending |
-| FRESH-05 | Phase 3 | Pending |
-| FRESH-06 | Phase 3 | Pending |
+| EXEC-03 | Phase 2 | Complete |
+| EXEC-04 | Phase 2 | Complete |
+| FRESH-01 | Phase 3 | Planned |
+| FRESH-02 | Phase 3 | Deferred (per D-11 — post-v1) |
+| FRESH-03 | Phase 3 | Planned |
+| FRESH-04 | Phase 3 | Planned |
+| FRESH-05 | Phase 3 | Deferred (per D-11 — post-v1) |
+| FRESH-06 | Phase 3 | Planned |
 | LOCK-01 | Phase 4 | Pending |
 | LOCK-02 | Phase 4 | Pending |
 | LOCK-03 | Phase 4 | Pending |
@@ -123,10 +129,10 @@ Plans:
 | CLOUD-03 | Phase 5 | Pending |
 
 **Coverage:**
-- v1 requirements: 26 total
+- v1 requirements: 26 total (24 planned for v1 + 2 deferred post-v1 per D-11)
 - Mapped to phases: 26
 - Unmapped: 0 ✓
 - Duplicates: 0 ✓
 
 ---
-*Last updated: 2026-04-19 — 02-04 (Wave 3: run_results.json parsing EXEC-02) complete; Phase 2 all 4/4 plans complete.*
+*Last updated: 2026-04-19 — Phase 3 planned (4 plans across 3 waves); FRESH-02 and FRESH-05 marked deferred per D-11.*
