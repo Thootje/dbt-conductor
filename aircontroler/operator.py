@@ -14,6 +14,7 @@ import subprocess
 
 from airflow.exceptions import AirflowException
 from airflow.providers.common.compat.sdk import BaseOperator
+from airflow.utils.session import create_session
 
 # Allowlist of adapter_response keys that are safe to emit in logs (T-2-01).
 # Fields like 'table_id', 'schema', or 'relation_name' are intentionally excluded
@@ -113,7 +114,6 @@ class DbtRunModelOperator(BaseOperator):
             # ── Phase 4: single-session conflict lock path ──────────────────────────
             from datetime import datetime, timezone
             from airflow.providers.common.compat.sdk import AirflowSkipException
-            from airflow.utils.session import create_session
             from aircontroler.hooks.metadata_db import MetadataDBHook
 
             hook = MetadataDBHook()

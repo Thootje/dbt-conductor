@@ -120,7 +120,6 @@ def test_get_conn_not_supported():
 # ── Phase 4: LOCK-02 / LOCK-04 hook method stubs ─────────────────────────
 
 
-@pytest.mark.xfail(strict=False, reason="Wave 1 implementation pending")
 def test_acquire_lock_returns_true_on_success(mocker):
     """LOCK-02: acquire_lock returns True when pg_try_advisory_xact_lock returns True."""
     from aircontroler.hooks.metadata_db import MetadataDBHook
@@ -131,7 +130,6 @@ def test_acquire_lock_returns_true_on_success(mocker):
     assert hook.acquire_lock("model.proj.stg_a", mock_session) is True
 
 
-@pytest.mark.xfail(strict=False, reason="Wave 1 implementation pending")
 def test_acquire_lock_returns_false_on_contention(mocker):
     """LOCK-02: acquire_lock returns False when pg_try_advisory_xact_lock returns False."""
     from aircontroler.hooks.metadata_db import MetadataDBHook
@@ -142,7 +140,6 @@ def test_acquire_lock_returns_false_on_contention(mocker):
     assert hook.acquire_lock("model.proj.stg_a", mock_session) is False
 
 
-@pytest.mark.xfail(strict=False, reason="Wave 1 implementation pending")
 def test_acquire_lock_sqlite_dialect_returns_true_with_warning(mocker):
     """LOCK-02 / D-13: On non-Postgres dialect, acquire_lock logs WARNING and returns True."""
     from aircontroler.hooks.metadata_db import MetadataDBHook
@@ -156,7 +153,6 @@ def test_acquire_lock_sqlite_dialect_returns_true_with_warning(mocker):
     mock_log.warning.assert_called_once()
 
 
-@pytest.mark.xfail(strict=False, reason="Wave 1 implementation pending")
 def test_acquire_lock_uses_adler32_hash_not_unique_id_in_sql(mocker):
     """Security T-4-01: acquire_lock passes unique_id hash as bind param, never raw string in SQL."""
     import sqlalchemy as sa
@@ -180,11 +176,15 @@ def test_acquire_lock_uses_adler32_hash_not_unique_id_in_sql(mocker):
     assert "model.proj.stg_a" not in stmt_str
 
 
-@pytest.mark.xfail(strict=False, reason="Wave 1 implementation pending")
 def test_upsert_lock_holder_writes_row(mocker):
-    """LOCK-04 / D-11: upsert_lock_holder commits identity row in a micro-transaction."""
+    """LOCK-04 / D-11: upsert_lock_holder commits identity row in a micro-transaction.
+
+    Uses postgresql dialect so the single pg_insert ON CONFLICT DO UPDATE path is taken
+    (one execute call). The SQLite fallback (DELETE + INSERT = 2 calls) is the dev-only path.
+    """
     from aircontroler.hooks.metadata_db import MetadataDBHook
     mock_session = mocker.MagicMock()
+    mock_session.get_bind.return_value.dialect.name = "postgresql"
     mocker.patch(
         "aircontroler.hooks.metadata_db.create_session",
         return_value=_mock_session_ctx(mocker, mock_session),
@@ -194,7 +194,6 @@ def test_upsert_lock_holder_writes_row(mocker):
     assert mock_session.execute.call_count == 1
 
 
-@pytest.mark.xfail(strict=False, reason="Wave 1 implementation pending")
 def test_delete_lock_holder_removes_row(mocker):
     """LOCK-04 / D-12: delete_lock_holder executes a delete via its own micro-transaction."""
     from aircontroler.hooks.metadata_db import MetadataDBHook
@@ -208,7 +207,6 @@ def test_delete_lock_holder_removes_row(mocker):
     assert mock_session.execute.call_count == 1
 
 
-@pytest.mark.xfail(strict=False, reason="Wave 1 implementation pending")
 def test_get_lock_holder_returns_row(mocker):
     """LOCK-04 / D-11: get_lock_holder returns a row-like object with dag_id and run_id."""
     from aircontroler.hooks.metadata_db import MetadataDBHook
@@ -223,7 +221,6 @@ def test_get_lock_holder_returns_row(mocker):
     assert row.dag_id == "dag_1"
 
 
-@pytest.mark.xfail(strict=False, reason="Wave 1 implementation pending")
 def test_get_last_run_accepts_session_param(mocker):
     """LOCK-02 / D-08: get_last_run(unique_id, session=session) uses the provided session."""
     from aircontroler.hooks.metadata_db import MetadataDBHook
@@ -235,7 +232,6 @@ def test_get_last_run_accepts_session_param(mocker):
     assert mock_session.execute.call_count == 1
 
 
-@pytest.mark.xfail(strict=False, reason="Wave 1 implementation pending")
 def test_record_run_accepts_session_param(mocker):
     """LOCK-02 / D-08: record_run(..., session=session) uses the provided session."""
     from aircontroler.hooks.metadata_db import MetadataDBHook
