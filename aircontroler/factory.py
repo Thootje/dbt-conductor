@@ -21,6 +21,7 @@ Usage:
 from __future__ import annotations
 
 import logging
+import os
 from typing import TYPE_CHECKING
 
 from aircontroler.manifest import ManifestNode, parse_manifest
@@ -41,6 +42,8 @@ def build_dbt_dag(
     profiles_path: str,
     dbt_executable_path: str | None = None,
     service_account: str | None = None,
+    cardinality_limit: int | None = None,
+    max_active_tasks: int | None = None,
 ) -> dict:
     """Render a dbt project as an Airflow DAG with one task per resolved model.
 
@@ -95,6 +98,25 @@ def build_dbt_dag(
         project_dir=project_dir,
         profiles_dir=profiles_path,
     )
+
+    # EXEC-03: cardinality guard at DAG parse time.
+    # Precedence: kwarg > env var > hardcoded default 800.
+    effective_limit: int = (
+        cardinality_limit
+        if cardinality_limit is not None
+        else int(os.environ.get("AIRCONTROLER_MAX_MODELS", 800))
+    )
+    if len(resolved_ids) > effective_limit:
+        raise ValueError(
+            f"Selector resolved to {len(resolved_ids):,} models "
+            f"(limit: {effective_limit:,}). "
+            "Narrow your --select filter or raise cardinality_limit=N in build_dbt_dag()."
+        )
+
+    # EXEC-04: DAG-level concurrency control.
+    # Only mutate when explicitly set; None preserves Airflow's default (16).
+    if max_active_tasks is not None:
+        dag.max_active_tasks = max_active_tasks
 
     # --- Parse-time step 3: Filter manifest to resolved nodes ---
     node_map: dict[str, ManifestNode] = {
