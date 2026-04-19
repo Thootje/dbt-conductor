@@ -1,0 +1,114 @@
+{
+  "metadata": {
+    "dbt_schema_version": "https://schemas.getdbt.com/dbt/manifest/v12/manifest.json",
+    "dbt_version": "1.8.0",
+    "generated_at": "2024-01-01T00:00:00.000000Z",
+    "invocation_id": "test-invocation-v12",
+    "env": {}
+  },
+  "nodes": {
+    "model.fixture_project.stg_a": {
+      "unique_id": "model.fixture_project.stg_a",
+      "name": "stg_a",
+      "resource_type": "model",
+      "depends_on": {
+        "nodes": []
+      },
+      "fqn": [
+        "fixture_project",
+        "stg_a"
+      ],
+      "tags": [],
+      "original_file_path": "models/stg_a.sql",
+      "config": {
+        "materialized": "view"
+      }
+    },
+    "model.fixture_project.stg_b": {
+      "unique_id": "model.fixture_project.stg_b",
+      "name": "stg_b",
+      "resource_type": "model",
+      "depends_on": {
+        "nodes": []
+      },
+      "fqn": [
+        "fixture_project",
+        "stg_b"
+      ],
+      "tags": [],
+      "original_file_path": "models/stg_b.sql",
+      "config": {
+        "materialized": "view"
+      }
+    },
+    "model.fixture_project.int_a": {
+      "unique_id": "model.fixture_project.int_a",
+      "name": "int_a",
+      "resource_type": "model",
+      "depends_on": {
+        "nodes": [
+          "model.fixture_project.stg_a"
+        ]
+      },
+      "fqn": [
+        "fixture_project",
+        "int_a"
+      ],
+      "tags": [],
+      "original_file_path": "models/int_a.sql",
+      "config": {
+        "materialized": "view"
+      }
+    },
+    "model.fixture_project.int_b": {
+      "unique_id": "model.fixture_project.int_b",
+      "name": "int_b",
+      "resource_type": "model",
+      "depends_on": {
+        "nodes": [
+          "model.fixture_project.stg_b"
+        ]
+      },
+      "fqn": [
+        "fixture_project",
+        "int_b"
+      ],
+      "tags": [],
+      "original_file_path": "models/int_b.sql",
+      "config": {
+        "materialized": "view"
+      }
+    },
+    "model.fixture_project.mart": {
+      "unique_id": "model.fixture_project.mart",
+      "name": "mart",
+      "resource_type": "model",
+      "depends_on": {
+        "nodes": [
+          "model.fixture_project.int_a",
+          "model.fixture_project.int_b"
+        ]
+      },
+      "fqn": [
+        "fixture_project",
+        "mart"
+      ],
+      "tags": [],
+      "original_file_path": "models/mart.sql",
+      "config": {
+        "materialized": "table",
+        "meta": {
+          "aircontroler": {
+            "retries": 3,
+            "retry_delay": 300,
+            "pool": "heavy_models"
+          }
+        }
+      }
+    }
+  },
+  "sources": {},
+  "exposures": {},
+  "metrics": {},
+  "unit_tests": {}
+}
