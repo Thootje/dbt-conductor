@@ -23,6 +23,18 @@ def manifest_v12_data() -> dict:
 
 
 @pytest.fixture
+def run_results_v6_data() -> dict:
+    """Load the hand-crafted v6 run_results fixture (one stg_a result entry)."""
+    return json.loads((FIXTURES_DIR / "run_results_v6.json").read_text())
+
+
+@pytest.fixture
+def manifest_with_meta_data() -> dict:
+    """Load v12 manifest fixture with meta.aircontroler on the mart node (EXEC-01)."""
+    return json.loads((FIXTURES_DIR / "manifest_v12_with_meta.json").read_text())
+
+
+@pytest.fixture
 def mock_dag():
     """Return a minimal Airflow DAG mock suitable for unit tests.
 
