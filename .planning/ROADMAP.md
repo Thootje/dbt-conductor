@@ -78,7 +78,7 @@ Plans:
 
 Plans:
 - [x] 04-01-PLAN.md — Wave 1: Alembic migration 0002 (lock_holders table) + db_manager extension + test stubs
-- [ ] 04-02-PLAN.md — Wave 2: MetadataDBHook new methods + operator conflict block + factory param
+- [x] 04-02-PLAN.md — Wave 2: MetadataDBHook new methods + operator conflict block + factory param
 - [ ] 04-03-PLAN.md — Wave 3: Chaos test (LOCK-05) + activate stubs + full suite gate
 
 ### Phase 5: Cloud Run + Distribution
@@ -98,7 +98,7 @@ Plans:
 | 1. Walking Skeleton | 5/5 | Complete | 2026-04-18 |
 | 2. Execution Hardening | 4/4 | Complete | 2026-04-19 |
 | 3. Freshness Policies | 4/4 | Complete | 2026-04-19 |
-| 4. Cross-DAG Conflict Locking | 1/3 | In progress | - |
+| 4. Cross-DAG Conflict Locking | 2/3 | In progress | - |
 | 5. Cloud Run + Distribution | 0/0 | Not started | - |
 
 ## Traceability
@@ -124,11 +124,11 @@ Plans:
 | FRESH-04 | Phase 3 | Planned |
 | FRESH-05 | Phase 3 | Deferred (per D-11 — post-v1) |
 | FRESH-06 | Phase 3 | Planned |
-| LOCK-01 | Phase 4 | Pending |
-| LOCK-02 | Phase 4 | Pending |
-| LOCK-03 | Phase 4 | Pending |
-| LOCK-04 | Phase 4 | Pending |
-| LOCK-05 | Phase 4 | Pending |
+| LOCK-01 | Phase 4 | Implemented (04-02) |
+| LOCK-02 | Phase 4 | Implemented (04-02) |
+| LOCK-03 | Phase 4 | Implemented (04-02) |
+| LOCK-04 | Phase 4 | Implemented (04-02) |
+| LOCK-05 | Phase 4 | Implemented (04-02) |
 | CLOUD-01 | Phase 5 | Pending |
 | CLOUD-02 | Phase 5 | Pending |
 | CLOUD-03 | Phase 5 | Pending |
@@ -140,4 +140,4 @@ Plans:
 - Duplicates: 0 ✓
 
 ---
-*Last updated: 2026-04-19 — Phase 3 planned (4 plans across 3 waves); FRESH-02 and FRESH-05 marked deferred per D-11.*
+*Last updated: 2026-04-19 — Phase 4 Plan 02 complete; LOCK-01 through LOCK-05 implemented. One plan remaining (04-03: activate stubs + chaos test).*

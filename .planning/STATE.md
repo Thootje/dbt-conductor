@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: "### Phase 1: Walking Skeleton"
 status: in-progress
-stopped_at: "Phase 4 Plan 01 complete. Wave 0 foundation: migration 0002 + test stubs."
-last_updated: "2026-04-19T10:22:04Z"
+stopped_at: "Phase 4 Plan 02 complete. Wave 1 implementation: MetadataDBHook locking methods + operator/factory conflict_policy."
+last_updated: "2026-04-19T10:29:00Z"
 progress:
   total_phases: 5
   completed_phases: 3
   total_plans: 16
-  completed_plans: 14
-  percent: 88
+  completed_plans: 15
+  percent: 94
 ---
 
 # Project State
@@ -34,7 +34,7 @@ See: .planning/PROJECT.md (updated 2026-04-17)
 | 1. Walking Skeleton | ✓ Complete | 5/5 | 100% |
 | 2. Execution Hardening | ✓ Complete | 4/4 | 100% |
 | 3. Freshness Policies | ✓ Complete | 4/4 | 100% |
-| 4. Cross-DAG Conflict Locking | ◆ In Progress | 1/3 | 33% |
+| 4. Cross-DAG Conflict Locking | ◆ In Progress | 2/3 | 67% |
 | 5. Cloud Run + Distribution | Not started | 0/0 | 0% |
 
 ## Notes
@@ -61,9 +61,13 @@ See: .planning/PROJECT.md (updated 2026-04-17)
 - Wave 0 (04-01): Migration 0002 chains off 0001 (down_revision='0001') forming a single linear revision head; revision_heads_map extended to include 1.1.0 -> 0002
 - Wave 0 (04-01): Rule 1 fix: test_db_manager.py revision_heads_map assertion updated from {"1.0.0": "0001"} to {"1.0.0": "0001", "1.1.0": "0002"} to match new correct value
 
+- Wave 1 (04-02): Removed duplicate local AirflowException import inside conflict_policy if-block — Python scoping makes any assignment in a function create a local binding, causing UnboundLocalError in Phase 3 path; module-level import at line 15 is sufficient
+- Wave 1 (04-02): acquire_lock uses session.get_bind().dialect.name (not deprecated session.bind) per SQLAlchemy 2.0 pattern
+- Wave 1 (04-02): upsert_lock_holder SQLite fallback: DELETE + INSERT (SQLAlchemy Core lacks cross-dialect ON CONFLICT DO UPDATE for non-Postgres)
+
 ## Session Continuity
 
 Last session: 2026-04-19
-Stopped at: Phase 4 Plan 01 complete. Wave 0 foundation delivered. Ready to execute Plan 04-02.
+Stopped at: Phase 4 Plan 02 complete. Wave 1 implementation delivered. Ready to execute Plan 04-03 (Wave 2: activate xfail stubs).
 
-- Next action: Execute Phase 4 Plan 02 (Wave 1: MetadataDBHook new methods + operator conflict block + factory param).
+- Next action: Execute Phase 4 Plan 03 (Wave 2: remove xfail markers from test stubs now that implementation is in place).
