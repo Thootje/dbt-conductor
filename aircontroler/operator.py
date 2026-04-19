@@ -50,6 +50,8 @@ class DbtRunModelOperator(BaseOperator):
         retries: int | None = None,
         retry_delay: int | None = None,
         pool: str | None = None,
+        freshness_hours: float | None = None,
+        trigger_rule: str = "none_failed",
         **kwargs,
     ) -> None:
         from datetime import timedelta
@@ -64,23 +66,69 @@ class DbtRunModelOperator(BaseOperator):
             kwargs["retry_delay"] = timedelta(seconds=retry_delay)
         if pool is not None:
             kwargs["pool"] = pool
+        # Phase 3 / D-02 / Pitfall 4: trigger_rule always forwarded as plain string
+        # ("none_failed" is the project default; don't import TriggerRule enum).
+        kwargs["trigger_rule"] = trigger_rule
         super().__init__(**kwargs)
         self.unique_id = unique_id
         self.project_dir = project_dir
         self.profiles_path = profiles_path
         self.dbt_executable_path = dbt_executable_path
         self.target_path = target_path
+        # Phase 3 / T-3-02: reject freshness_hours <= 0 (log WARNING, treat as None)
+        if freshness_hours is not None and freshness_hours <= 0:
+            self.log.warning(
+                "freshness_hours=%s is not positive for %s — treating as None (always run dbt)",
+                freshness_hours, unique_id,
+            )
+            freshness_hours = None
+        self.freshness_hours = freshness_hours
 
     def execute(self, context: dict) -> None:
         """Run 'dbt build --select <unique_id>' as a subprocess.
 
-        Streams stdout/stderr to the Airflow task log.
-        Raises AirflowException on non-zero dbt exit code.
+        Phase 3 (FRESH-03): before the subprocess, consult MetadataDBHook.get_last_run()
+        and raise AirflowSkipException if the model ran successfully within freshness_hours.
+        On success (returncode 0, after _log_run_results), call record_run() to persist state.
 
         Security note: cmd is always list[str]; no shell passthrough is used.
         profiles_path is passed as a directory path flag; file contents are
         never read by this method and never appear in logs.
         """
+        # Phase 3: FRESH-03 freshness TTL check — before subprocess
+        if self.freshness_hours is not None:
+            from datetime import datetime, timezone
+            from aircontroler.hooks.metadata_db import MetadataDBHook
+            from airflow.providers.common.compat.sdk import AirflowSkipException
+            hook = MetadataDBHook()
+            try:
+                last_run = hook.get_last_run(self.unique_id)
+            except Exception as exc:
+                # Fail-open (Nyquist dim 8): on any DB error (e.g., table not yet created
+                # on Airflow 2.x pre-`aircontroler db init`), log WARNING and proceed to dbt.
+                self.log.warning(
+                    "Freshness check failed for %s: %s — running dbt (fail-open)",
+                    self.unique_id, exc,
+                )
+                last_run = None
+            if last_run is not None:
+                # Pitfall 5: normalize to UTC. SQLite and some drivers strip tzinfo;
+                # if naive, treat as UTC (matches the hook's write-side UTC stamp).
+                if last_run.tzinfo is None:
+                    last_run = last_run.replace(tzinfo=timezone.utc)
+                now = datetime.now(tz=timezone.utc)
+                elapsed_hours = (now - last_run).total_seconds() / 3600
+                if elapsed_hours < self.freshness_hours:
+                    self.log.info(
+                        "Skipping %s: last run %.2f hours ago (TTL: %.1f hours)",
+                        self.unique_id, elapsed_hours, self.freshness_hours,
+                    )
+                    raise AirflowSkipException(
+                        f"{self.unique_id} is fresh "
+                        f"(last ran {elapsed_hours:.2f}h ago, TTL {self.freshness_hours}h)"
+                    )
+
+        # Existing Phase 1 / 2 subprocess logic — unchanged structure
         executable = self.dbt_executable_path or "dbt"
         cmd = [
             executable,
@@ -109,6 +157,24 @@ class DbtRunModelOperator(BaseOperator):
         if result.stdout:
             self.log.info(result.stdout)
         self._log_run_results()
+
+        # Phase 3 / FRESH-04 / Nyquist dims 4-6: record_run on success path ONLY.
+        # NOT reached on failure (AirflowException above) or on skip (AirflowSkipException earlier).
+        from aircontroler.hooks.metadata_db import MetadataDBHook
+        hook = MetadataDBHook()
+        try:
+            hook.record_run(
+                unique_id=self.unique_id,
+                dag_id=context["dag_run"].dag_id,
+                run_id=context["run_id"],
+            )
+        except Exception as exc:
+            # Don't fail the task if state recording fails (table missing on Airflow 2.x, etc.)
+            # — log WARNING. The model ran successfully; recording is best-effort.
+            self.log.warning(
+                "record_run failed for %s: %s — state table not updated",
+                self.unique_id, exc,
+            )
 
     def _run_results_path(self):
         """Resolve the path to run_results.json based on target_path or project_dir."""

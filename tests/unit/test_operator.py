@@ -382,3 +382,318 @@ def test_run_results_does_not_log_compiled_code_or_relation(mocker, tmp_path, ru
     assert "relation_name" not in all_messages, f"Security violation T-2-01: relation_name key logged. Messages: {all_messages}"
     # Fixture's relation_name is '"memory"."main"."stg_a"' — verify inner strings not logged
     assert '"main"."stg_a"' not in all_messages, f"Security violation T-2-01: relation contents logged. Messages: {all_messages}"
+
+
+# ----------------------------------------------------------------------
+# Phase 3 — FRESH-03 / FRESH-04 — freshness check + record_run wiring
+# ----------------------------------------------------------------------
+
+
+def _make_fresh_context():
+    """Return a mock Airflow context with dag_run.dag_id and run_id populated."""
+    from unittest.mock import MagicMock
+    ctx = {}
+    dag_run = MagicMock()
+    dag_run.dag_id = "test_dag"
+    ctx["dag_run"] = dag_run
+    ctx["run_id"] = "test_run_id"
+    return ctx
+
+
+def test_freshness_hours_stored_on_instance():
+    """FRESH-01: freshness_hours kwarg is stored as instance attribute."""
+    from aircontroler.operator import DbtRunModelOperator
+    op = DbtRunModelOperator(
+        task_id="model.proj.stg_a",
+        unique_id="model.proj.stg_a",
+        project_dir="/proj",
+        profiles_path="/profiles",
+        freshness_hours=6.0,
+    )
+    assert op.freshness_hours == 6.0
+
+
+def test_freshness_hours_default_is_none():
+    """D-12: freshness_hours defaults to None → freshness check skipped entirely."""
+    from aircontroler.operator import DbtRunModelOperator
+    op = DbtRunModelOperator(
+        task_id="model.proj.stg_a",
+        unique_id="model.proj.stg_a",
+        project_dir="/proj",
+        profiles_path="/profiles",
+    )
+    assert op.freshness_hours is None
+
+
+def test_freshness_hours_zero_treated_as_none(mocker):
+    """T-3-02 / Security V5: freshness_hours <= 0 logged WARNING and coerced to None."""
+    from aircontroler.operator import DbtRunModelOperator
+    mock_log = mocker.MagicMock()
+    mocker.patch.object(
+        DbtRunModelOperator, "log",
+        new_callable=mocker.PropertyMock, return_value=mock_log,
+    )
+    op = DbtRunModelOperator(
+        task_id="model.proj.stg_a",
+        unique_id="model.proj.stg_a",
+        project_dir="/proj",
+        profiles_path="/profiles",
+        freshness_hours=0,
+    )
+    assert op.freshness_hours is None
+    assert mock_log.warning.called
+
+
+def test_freshness_hours_negative_treated_as_none(mocker):
+    """T-3-02: negative freshness_hours logged WARNING and coerced to None."""
+    from aircontroler.operator import DbtRunModelOperator
+    mock_log = mocker.MagicMock()
+    mocker.patch.object(
+        DbtRunModelOperator, "log",
+        new_callable=mocker.PropertyMock, return_value=mock_log,
+    )
+    op = DbtRunModelOperator(
+        task_id="model.proj.stg_a",
+        unique_id="model.proj.stg_a",
+        project_dir="/proj",
+        profiles_path="/profiles",
+        freshness_hours=-5,
+    )
+    assert op.freshness_hours is None
+    assert mock_log.warning.called
+
+
+def test_trigger_rule_default_is_none_failed():
+    """D-02: default trigger_rule='none_failed' so downstream runs when upstreams skipped."""
+    from aircontroler.operator import DbtRunModelOperator
+    op = DbtRunModelOperator(
+        task_id="model.proj.stg_a",
+        unique_id="model.proj.stg_a",
+        project_dir="/proj",
+        profiles_path="/profiles",
+    )
+    assert op.trigger_rule == "none_failed"
+
+
+def test_trigger_rule_override():
+    """D-03: trigger_rule kwarg overrides the default."""
+    from aircontroler.operator import DbtRunModelOperator
+    op = DbtRunModelOperator(
+        task_id="model.proj.stg_a",
+        unique_id="model.proj.stg_a",
+        project_dir="/proj",
+        profiles_path="/profiles",
+        trigger_rule="all_done",
+    )
+    assert op.trigger_rule == "all_done"
+
+
+def test_skip_when_fresh(mocker):
+    """Nyquist dim 1: FRESH-03 — last_run within TTL → AirflowSkipException, no subprocess."""
+    from datetime import datetime, timedelta, timezone
+    from aircontroler.operator import DbtRunModelOperator
+    from airflow.providers.common.compat.sdk import AirflowSkipException
+    # Last run 2 hours ago; TTL 6 hours → fresh → skip
+    mocker.patch(
+        "aircontroler.hooks.metadata_db.MetadataDBHook.get_last_run",
+        return_value=datetime.now(tz=timezone.utc) - timedelta(hours=2),
+    )
+    mock_run = mocker.patch("aircontroler.operator.subprocess.run")
+    op = DbtRunModelOperator(
+        task_id="model.proj.stg_a",
+        unique_id="model.proj.stg_a",
+        project_dir="/proj",
+        profiles_path="/profiles",
+        freshness_hours=6.0,
+    )
+    with pytest.raises(AirflowSkipException) as exc_info:
+        op.execute(_make_fresh_context())
+    assert "model.proj.stg_a" in str(exc_info.value)
+    assert mock_run.call_count == 0, "subprocess.run MUST NOT be called on skip path"
+
+
+def test_no_skip_when_stale(mocker):
+    """Nyquist dim 2: FRESH-03 — last_run outside TTL → subprocess invoked."""
+    from datetime import datetime, timedelta, timezone
+    from aircontroler.operator import DbtRunModelOperator
+    # Last run 10 hours ago; TTL 6 hours → stale → run dbt
+    mocker.patch(
+        "aircontroler.hooks.metadata_db.MetadataDBHook.get_last_run",
+        return_value=datetime.now(tz=timezone.utc) - timedelta(hours=10),
+    )
+    mocker.patch("aircontroler.hooks.metadata_db.MetadataDBHook.record_run")
+    mock_run = mocker.patch("aircontroler.operator.subprocess.run")
+    mock_run.return_value = mocker.MagicMock(returncode=0, stdout="", stderr="")
+    op = DbtRunModelOperator(
+        task_id="model.proj.stg_a",
+        unique_id="model.proj.stg_a",
+        project_dir="/proj",
+        profiles_path="/profiles",
+        freshness_hours=6.0,
+    )
+    op.execute(_make_fresh_context())
+    assert mock_run.call_count == 1
+
+
+def test_no_skip_when_no_ttl(mocker):
+    """Nyquist dim 3: D-12 — freshness_hours=None → no hook call, dbt always invoked."""
+    from aircontroler.operator import DbtRunModelOperator
+    hook_get = mocker.patch("aircontroler.hooks.metadata_db.MetadataDBHook.get_last_run")
+    mocker.patch("aircontroler.hooks.metadata_db.MetadataDBHook.record_run")
+    mock_run = mocker.patch("aircontroler.operator.subprocess.run")
+    mock_run.return_value = mocker.MagicMock(returncode=0, stdout="", stderr="")
+    op = DbtRunModelOperator(
+        task_id="model.proj.stg_a",
+        unique_id="model.proj.stg_a",
+        project_dir="/proj",
+        profiles_path="/profiles",
+        # freshness_hours omitted → None
+    )
+    op.execute(_make_fresh_context())
+    assert hook_get.call_count == 0, "get_last_run MUST NOT be called when freshness_hours is None"
+    assert mock_run.call_count == 1
+
+
+def test_no_skip_when_no_last_run(mocker):
+    """FRESH-03: last_run=None (never ran before) → no skip, dbt invoked."""
+    from aircontroler.operator import DbtRunModelOperator
+    mocker.patch(
+        "aircontroler.hooks.metadata_db.MetadataDBHook.get_last_run",
+        return_value=None,
+    )
+    mocker.patch("aircontroler.hooks.metadata_db.MetadataDBHook.record_run")
+    mock_run = mocker.patch("aircontroler.operator.subprocess.run")
+    mock_run.return_value = mocker.MagicMock(returncode=0, stdout="", stderr="")
+    op = DbtRunModelOperator(
+        task_id="model.proj.stg_a",
+        unique_id="model.proj.stg_a",
+        project_dir="/proj",
+        profiles_path="/profiles",
+        freshness_hours=6.0,
+    )
+    op.execute(_make_fresh_context())
+    assert mock_run.call_count == 1
+
+
+def test_record_run_called_on_success(mocker):
+    """Nyquist dim 4: FRESH-04 — successful dbt → record_run(unique_id, dag_id, run_id)."""
+    from aircontroler.operator import DbtRunModelOperator
+    mocker.patch(
+        "aircontroler.hooks.metadata_db.MetadataDBHook.get_last_run",
+        return_value=None,
+    )
+    hook_rec = mocker.patch("aircontroler.hooks.metadata_db.MetadataDBHook.record_run")
+    mock_run = mocker.patch("aircontroler.operator.subprocess.run")
+    mock_run.return_value = mocker.MagicMock(returncode=0, stdout="", stderr="")
+    op = DbtRunModelOperator(
+        task_id="model.proj.stg_a",
+        unique_id="model.proj.stg_a",
+        project_dir="/proj",
+        profiles_path="/profiles",
+        freshness_hours=6.0,
+    )
+    op.execute(_make_fresh_context())
+    assert hook_rec.call_count == 1
+    call_kwargs = hook_rec.call_args.kwargs
+    assert call_kwargs["unique_id"] == "model.proj.stg_a"
+    assert call_kwargs["dag_id"] == "test_dag"
+    assert call_kwargs["run_id"] == "test_run_id"
+
+
+def test_record_run_not_called_on_failure(mocker):
+    """Nyquist dim 5: failed dbt (non-zero returncode) → record_run NOT called."""
+    from aircontroler.operator import DbtRunModelOperator
+    from airflow.exceptions import AirflowException
+    mocker.patch(
+        "aircontroler.hooks.metadata_db.MetadataDBHook.get_last_run",
+        return_value=None,
+    )
+    hook_rec = mocker.patch("aircontroler.hooks.metadata_db.MetadataDBHook.record_run")
+    mock_run = mocker.patch("aircontroler.operator.subprocess.run")
+    mock_run.return_value = mocker.MagicMock(returncode=1, stdout="", stderr="boom")
+    op = DbtRunModelOperator(
+        task_id="model.proj.stg_a",
+        unique_id="model.proj.stg_a",
+        project_dir="/proj",
+        profiles_path="/profiles",
+        freshness_hours=6.0,
+    )
+    with pytest.raises(AirflowException):
+        op.execute(_make_fresh_context())
+    assert hook_rec.call_count == 0
+
+
+def test_record_run_not_called_on_skip(mocker):
+    """Nyquist dim 6: skip path (fresh) → record_run NOT called."""
+    from datetime import datetime, timedelta, timezone
+    from aircontroler.operator import DbtRunModelOperator
+    from airflow.providers.common.compat.sdk import AirflowSkipException
+    mocker.patch(
+        "aircontroler.hooks.metadata_db.MetadataDBHook.get_last_run",
+        return_value=datetime.now(tz=timezone.utc) - timedelta(hours=1),
+    )
+    hook_rec = mocker.patch("aircontroler.hooks.metadata_db.MetadataDBHook.record_run")
+    mocker.patch("aircontroler.operator.subprocess.run")
+    op = DbtRunModelOperator(
+        task_id="model.proj.stg_a",
+        unique_id="model.proj.stg_a",
+        project_dir="/proj",
+        profiles_path="/profiles",
+        freshness_hours=6.0,
+    )
+    with pytest.raises(AirflowSkipException):
+        op.execute(_make_fresh_context())
+    assert hook_rec.call_count == 0
+
+
+def test_fail_open_on_missing_table(mocker):
+    """Nyquist dim 8: get_last_run raises DB error → log WARNING, run dbt (fail-open)."""
+    from aircontroler.operator import DbtRunModelOperator
+    mocker.patch(
+        "aircontroler.hooks.metadata_db.MetadataDBHook.get_last_run",
+        side_effect=Exception("no such table: aircontroler_model_runs"),
+    )
+    mocker.patch("aircontroler.hooks.metadata_db.MetadataDBHook.record_run")
+    mock_run = mocker.patch("aircontroler.operator.subprocess.run")
+    mock_run.return_value = mocker.MagicMock(returncode=0, stdout="", stderr="")
+    mock_log = mocker.MagicMock()
+    mocker.patch.object(
+        DbtRunModelOperator, "log",
+        new_callable=mocker.PropertyMock, return_value=mock_log,
+    )
+    op = DbtRunModelOperator(
+        task_id="model.proj.stg_a",
+        unique_id="model.proj.stg_a",
+        project_dir="/proj",
+        profiles_path="/profiles",
+        freshness_hours=6.0,
+    )
+    op.execute(_make_fresh_context())
+    assert mock_run.call_count == 1
+    # WARNING was logged for the failed hook call
+    assert any("fail-open" in str(call).lower() or "freshness" in str(call).lower()
+               for call in mock_log.warning.call_args_list)
+
+
+def test_naive_last_run_treated_as_utc(mocker):
+    """Pitfall 5: last_run without tzinfo is treated as UTC (SQLite strips tz)."""
+    from datetime import datetime, timedelta, timezone
+    from aircontroler.operator import DbtRunModelOperator
+    from airflow.providers.common.compat.sdk import AirflowSkipException
+    # Return a NAIVE datetime 1 hour ago (SQLite behavior). Must be treated as UTC.
+    naive_last_run = (datetime.now(tz=timezone.utc) - timedelta(hours=1)).replace(tzinfo=None)
+    mocker.patch(
+        "aircontroler.hooks.metadata_db.MetadataDBHook.get_last_run",
+        return_value=naive_last_run,
+    )
+    mocker.patch("aircontroler.operator.subprocess.run")
+    op = DbtRunModelOperator(
+        task_id="model.proj.stg_a",
+        unique_id="model.proj.stg_a",
+        project_dir="/proj",
+        profiles_path="/profiles",
+        freshness_hours=6.0,
+    )
+    # Must NOT raise TypeError on comparison; must raise AirflowSkipException (fresh)
+    with pytest.raises(AirflowSkipException):
+        op.execute(_make_fresh_context())

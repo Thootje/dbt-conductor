@@ -47,6 +47,7 @@ def build_dbt_dag(
     pool: str | None = None,
     pool_slots: int = 1,
     target_path: str | None = None,
+    trigger_rule: str = "none_failed",
 ) -> dict:
     """Render a dbt project as an Airflow DAG with one task per resolved model.
 
@@ -143,6 +144,8 @@ def build_dbt_dag(
         ac_meta = node.config.get("meta", {}).get("aircontroler", {})
         # D-16: per-model pool overrides DAG-level pool.
         task_pool = ac_meta.get("pool") or pool or None
+        # D-03: per-model trigger_rule overrides DAG-level (same `or` short-circuit as pool).
+        task_trigger_rule = ac_meta.get("trigger_rule") or trigger_rule
         tasks[uid] = DbtRunModelOperator(
             task_id=uid,
             dag=dag,
@@ -155,6 +158,8 @@ def build_dbt_dag(
             retry_delay=ac_meta.get("retry_delay"),
             pool=task_pool,
             pool_slots=pool_slots if task_pool else 1,
+            freshness_hours=ac_meta.get("freshness_hours"),   # D-10 / FRESH-01
+            trigger_rule=task_trigger_rule,                    # D-02 / D-03
         )
 
     # --- Parse-time step 5: Wire edges from manifest depends_on ---

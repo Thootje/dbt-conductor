@@ -470,3 +470,196 @@ def test_freshness_key_ignored(mocker, manifest_v11_data, tmp_path):
     target_uid = nodes[0].unique_id
     assert target_uid in result["tasks"]
     assert result["tasks"][target_uid].retries == 0
+
+
+# ----------------------------------------------------------------------
+# Phase 3 — FRESH-01 / FRESH-03 — factory wiring for freshness + trigger_rule
+# ----------------------------------------------------------------------
+
+
+def _stub_resolver(mocker, uids):
+    """Patch SelectorResolver.resolve to return the given set of unique_ids."""
+    mocker.patch(
+        "aircontroler.factory.SelectorResolver.resolve",
+        return_value=set(uids),
+    )
+
+
+def _stub_manifest(mocker, manifest_dict):
+    """Patch parse_manifest to return ManifestNode list from the given manifest dict."""
+    from aircontroler.manifest import ManifestNode
+    nodes = []
+    for uid, raw in manifest_dict["nodes"].items():
+        nodes.append(
+            ManifestNode(
+                unique_id=uid,
+                name=raw["name"],
+                resource_type=raw["resource_type"],
+                depends_on=raw.get("depends_on", {}).get("nodes", []),
+                fqn=raw.get("fqn", []),
+                tags=raw.get("tags", []),
+                original_file_path=raw.get("original_file_path", ""),
+                config=raw.get("config", {}),
+            )
+        )
+    mocker.patch("aircontroler.factory.parse_manifest", return_value=nodes)
+
+
+def test_freshness_hours_extracted_from_manifest(mocker, manifest_with_freshness_data):
+    """FRESH-01 / D-10: factory extracts meta.aircontroler.freshness_hours per node."""
+    from airflow import DAG
+    from aircontroler.factory import build_dbt_dag
+    _stub_manifest(mocker, manifest_with_freshness_data)
+    _stub_resolver(mocker, manifest_with_freshness_data["nodes"].keys())
+    dag = DAG("test_dag", schedule=None, start_date=None)
+    result = build_dbt_dag(
+        dag=dag,
+        manifest_path="/not/used",
+        dbt_command="dbt build --select tag:all",
+        project_dir="/proj",
+        profiles_path="/profiles",
+    )
+    # stg_a has freshness_hours: 6 in the fixture
+    assert result["tasks"]["model.fixture_project.stg_a"].freshness_hours == 6
+    # mart has freshness_hours: 24
+    assert result["tasks"]["model.fixture_project.mart"].freshness_hours == 24
+    # stg_b has no meta.aircontroler → freshness_hours is None
+    assert result["tasks"]["model.fixture_project.stg_b"].freshness_hours is None
+
+
+def test_trigger_rule_default_is_none_failed(mocker, manifest_v12_data):
+    """D-02: default trigger_rule for all generated tasks is 'none_failed'."""
+    from airflow import DAG
+    from aircontroler.factory import build_dbt_dag
+    _stub_manifest(mocker, manifest_v12_data)
+    _stub_resolver(mocker, manifest_v12_data["nodes"].keys())
+    dag = DAG("test_dag", schedule=None, start_date=None)
+    result = build_dbt_dag(
+        dag=dag,
+        manifest_path="/not/used",
+        dbt_command="dbt build --select tag:all",
+        project_dir="/proj",
+        profiles_path="/profiles",
+    )
+    for task in result["tasks"].values():
+        assert task.trigger_rule == "none_failed"
+
+
+def test_trigger_rule_dag_level_override(mocker, manifest_v12_data):
+    """D-03: build_dbt_dag(trigger_rule=...) sets default for all tasks in that DAG."""
+    from airflow import DAG
+    from aircontroler.factory import build_dbt_dag
+    _stub_manifest(mocker, manifest_v12_data)
+    _stub_resolver(mocker, manifest_v12_data["nodes"].keys())
+    dag = DAG("test_dag", schedule=None, start_date=None)
+    result = build_dbt_dag(
+        dag=dag,
+        manifest_path="/not/used",
+        dbt_command="dbt build --select tag:all",
+        project_dir="/proj",
+        profiles_path="/profiles",
+        trigger_rule="all_success",
+    )
+    for task in result["tasks"].values():
+        assert task.trigger_rule == "all_success"
+
+
+def test_trigger_rule_per_model_overrides_dag_level(mocker):
+    """D-03: meta.aircontroler.trigger_rule on a specific node overrides DAG-level."""
+    from airflow import DAG
+    from aircontroler.factory import build_dbt_dag
+    # Build a minimal manifest inline where stg_a has meta.aircontroler.trigger_rule="all_done"
+    manifest = {
+        "nodes": {
+            "model.p.stg_a": {
+                "unique_id": "model.p.stg_a",
+                "name": "stg_a",
+                "resource_type": "model",
+                "depends_on": {"nodes": []},
+                "fqn": ["p", "stg_a"],
+                "tags": [],
+                "original_file_path": "models/stg_a.sql",
+                "config": {
+                    "materialized": "view",
+                    "meta": {"aircontroler": {"trigger_rule": "all_done"}},
+                },
+            },
+            "model.p.stg_b": {
+                "unique_id": "model.p.stg_b",
+                "name": "stg_b",
+                "resource_type": "model",
+                "depends_on": {"nodes": []},
+                "fqn": ["p", "stg_b"],
+                "tags": [],
+                "original_file_path": "models/stg_b.sql",
+                "config": {"materialized": "view"},
+            },
+        }
+    }
+    _stub_manifest(mocker, manifest)
+    _stub_resolver(mocker, manifest["nodes"].keys())
+    dag = DAG("test_dag", schedule=None, start_date=None)
+    result = build_dbt_dag(
+        dag=dag,
+        manifest_path="/not/used",
+        dbt_command="dbt build --select tag:all",
+        project_dir="/proj",
+        profiles_path="/profiles",
+        trigger_rule="none_failed",
+    )
+    assert result["tasks"]["model.p.stg_a"].trigger_rule == "all_done"
+    assert result["tasks"]["model.p.stg_b"].trigger_rule == "none_failed"
+
+
+def test_none_failed_permits_skipped_upstream_topology(mocker, manifest_v12_data):
+    """Nyquist dim 7: DAG topology — none_failed means downstream CAN run even when upstream is SKIPPED.
+
+    This test verifies the *topology* — that the generated tasks carry the
+    none_failed trigger_rule which Airflow treats as "run if no upstream failed,
+    including when upstreams are skipped". The actual runtime behavior is an
+    Airflow-scheduler concern; here we verify the operator configuration is correct.
+    """
+    from airflow import DAG
+    from aircontroler.factory import build_dbt_dag
+    _stub_manifest(mocker, manifest_v12_data)
+    _stub_resolver(mocker, manifest_v12_data["nodes"].keys())
+    dag = DAG("test_dag", schedule=None, start_date=None)
+    result = build_dbt_dag(
+        dag=dag,
+        manifest_path="/not/used",
+        dbt_command="dbt build --select tag:all",
+        project_dir="/proj",
+        profiles_path="/profiles",
+    )
+    # mart depends on int_a and int_b (a diamond) — under none_failed, mart runs
+    # even if int_a was skipped (fresh). Assert mart's trigger_rule and that it has
+    # resolved upstreams in the generated DAG.
+    mart = result["tasks"]["model.fixture_project.mart"]
+    int_a = result["tasks"]["model.fixture_project.int_a"]
+    int_b = result["tasks"]["model.fixture_project.int_b"]
+    assert mart.trigger_rule == "none_failed"
+    # Validate DAG edge wiring — mart's upstreams contain int_a and int_b
+    upstream_ids = {t.task_id for t in mart.upstream_list}
+    assert "model.fixture_project.int_a" in upstream_ids
+    assert "model.fixture_project.int_b" in upstream_ids
+
+
+def test_freshness_with_meta_preserves_phase2_overrides(mocker, manifest_with_freshness_data):
+    """Phase 2 regression: freshness_hours extraction must coexist with retries/retry_delay/pool."""
+    from airflow import DAG
+    from aircontroler.factory import build_dbt_dag
+    _stub_manifest(mocker, manifest_with_freshness_data)
+    _stub_resolver(mocker, manifest_with_freshness_data["nodes"].keys())
+    dag = DAG("test_dag", schedule=None, start_date=None)
+    result = build_dbt_dag(
+        dag=dag,
+        manifest_path="/not/used",
+        dbt_command="dbt build --select tag:all",
+        project_dir="/proj",
+        profiles_path="/profiles",
+    )
+    # mart has retries=3, retry_delay=300, pool=heavy_models, freshness_hours=24
+    mart = result["tasks"]["model.fixture_project.mart"]
+    assert mart.freshness_hours == 24
+    assert mart.pool == "heavy_models"
+    assert mart.retries == 3
