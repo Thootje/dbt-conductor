@@ -167,3 +167,12 @@ No new network endpoints, auth paths, or trust boundary surface introduced in th
 ---
 *Phase: 04-cross-dag-conflict-locking*
 *Completed: 2026-04-19*
+
+## Self-Check: PASSED
+
+- FOUND: `aircontroler/migrations/versions/0002_add_lock_holders_table.py`
+- FOUND: `tests/unit/test_lock_chaos.py`
+- FOUND: `.planning/phases/04-cross-dag-conflict-locking/04-01-SUMMARY.md`
+- FOUND: commit `38d4486` (Task 1)
+- FOUND: commit `6f54494` (Task 2)
+- FOUND: commit `359c975` (metadata)
