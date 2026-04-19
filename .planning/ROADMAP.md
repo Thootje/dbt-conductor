@@ -7,7 +7,7 @@
 ## Phases
 
 - [ ] **Phase 1: Walking Skeleton** - User can render a dbt project as a per-model Airflow DAG running on Composer + BigQuery
-- [ ] **Phase 2: Execution Hardening** - User gets production-grade per-task overrides, structured run results, and parse-time safety guards
+- [x] **Phase 2: Execution Hardening** - User gets production-grade per-task overrides, structured run results, and parse-time safety guards
 - [ ] **Phase 3: Freshness Policies** - User can define time-based TTLs that skip already-fresh models across DAGs (D1 differentiator)
 - [ ] **Phase 4: Cross-DAG Conflict Locking** - User can configure skip/fail conflict policies that prevent concurrent DAGs from double-running the same model (D2 differentiator)
 - [ ] **Phase 5: Cloud Run + Distribution** - User can deploy aircontroler on Cloud Run executor with per-model GCP service accounts
@@ -46,7 +46,7 @@ Plans:
 - [x] 02-01-PLAN.md — Wave 0: test fixtures (run_results_v6.json, manifest_v12_with_meta.json) + conftest fixtures
 - [x] 02-02-PLAN.md — Wave 1: cardinality guard (EXEC-03) + max_active_tasks (EXEC-04) in factory.py
 - [x] 02-03-PLAN.md — Wave 2: per-model meta overrides (EXEC-01) — operator constructor expansion + factory meta extraction loop
-- [ ] 02-04-PLAN.md — Wave 3: run_results.json parsing (EXEC-02) — operator _log_run_results + integration test
+- [x] 02-04-PLAN.md — Wave 3: run_results.json parsing (EXEC-02) — operator _log_run_results + integration test
 
 ### Phase 3: Freshness Policies
 **Goal:** User can define time-based freshness TTLs per model so that tasks skip execution when the model was already built recently in any DAG — the first of two headline differentiators over Cosmos.
@@ -85,7 +85,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Walking Skeleton | 5/5 | Complete | 2026-04-18 |
-| 2. Execution Hardening | 3/4 | In progress | - |
+| 2. Execution Hardening | 4/4 | Complete | 2026-04-19 |
 | 3. Freshness Policies | 0/0 | Not started | - |
 | 4. Cross-DAG Conflict Locking | 0/0 | Not started | - |
 | 5. Cloud Run + Distribution | 0/0 | Not started | - |
@@ -104,7 +104,7 @@ Plans:
 | CORE-08 | Phase 1 | Pending |
 | CORE-09 | Phase 1 | Pending |
 | EXEC-01 | Phase 2 | Pending |
-| EXEC-02 | Phase 2 | Pending |
+| EXEC-02 | Phase 2 | Complete |
 | EXEC-03 | Phase 2 | Pending |
 | EXEC-04 | Phase 2 | Pending |
 | FRESH-01 | Phase 3 | Pending |
@@ -129,4 +129,4 @@ Plans:
 - Duplicates: 0 ✓
 
 ---
-*Last updated: 2026-04-19 — 02-03 (Wave 2: per-model meta overrides EXEC-01) complete; Phase 2 at 3/4 plans.*
+*Last updated: 2026-04-19 — 02-04 (Wave 3: run_results.json parsing EXEC-02) complete; Phase 2 all 4/4 plans complete.*
