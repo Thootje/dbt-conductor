@@ -51,7 +51,7 @@ def mock_dag():
 @pytest.fixture
 def mock_context():
     """Return a minimal Airflow task execution context mock."""
-    context = MagicMock()
-    context["run_id"] = "test_run_id"
-    context["task_instance"] = MagicMock()
-    return context
+    return {
+        "run_id": "test_run_id",
+        "task_instance": MagicMock(),
+    }
