@@ -92,7 +92,6 @@ class DbtRunModelOperator(BaseOperator):
             text=True,
             check=False,
         )
-        self.log.info(result.stdout)
         if result.returncode != 0:
             if result.stdout:
                 self.log.error("dbt stdout:\n%s", result.stdout)
@@ -101,6 +100,9 @@ class DbtRunModelOperator(BaseOperator):
                 f"dbt build failed for {self.unique_id!r} "
                 f"(exit {result.returncode})"
             )
+        # Success: log stdout once at INFO.
+        if result.stdout:
+            self.log.info(result.stdout)
         self._log_run_results()
 
     def _run_results_path(self):
