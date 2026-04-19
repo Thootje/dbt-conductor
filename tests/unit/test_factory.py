@@ -291,3 +291,182 @@ def test_max_active_tasks_default_none(mocker, manifest_v11_data, tmp_path):
         )
     # Attribute was NOT mutated by factory; equals whatever Airflow defaults to (16 in 3.2.0)
     assert dag.max_active_tasks == original_value
+
+
+def test_meta_forwarding_to_operator(mocker, manifest_with_meta_data, tmp_path):
+    """EXEC-01: Factory reads meta.aircontroler from manifest and passes to operator."""
+    from datetime import timedelta
+    from airflow.models import DAG
+    from aircontroler.factory import build_dbt_dag
+    nodes = _make_nodes(manifest_with_meta_data)
+    all_uids = {n.unique_id for n in nodes}
+    mocker.patch("aircontroler.factory.parse_manifest", return_value=nodes)
+    mocker.patch("aircontroler.factory.SelectorResolver.resolve", return_value=all_uids)
+    with DAG("test_dag_meta_fwd", schedule=None) as dag:
+        result = build_dbt_dag(
+            dag=dag,
+            manifest_path=str(tmp_path / "manifest.json"),
+            dbt_command="dbt build --select +mart",
+            project_dir=str(tmp_path),
+            profiles_path=str(tmp_path),
+        )
+    mart_task = result["tasks"]["model.fixture_project.mart"]
+    assert mart_task.retries == 3
+    assert mart_task.retry_delay == timedelta(seconds=300)
+    assert mart_task.pool == "heavy_models"
+
+
+def test_no_meta_node_uses_defaults(mocker, manifest_with_meta_data, tmp_path):
+    """EXEC-01: Nodes without meta.aircontroler get BaseOperator defaults (retries=0)."""
+    from airflow.models import DAG
+    from aircontroler.factory import build_dbt_dag
+    nodes = _make_nodes(manifest_with_meta_data)
+    all_uids = {n.unique_id for n in nodes}
+    mocker.patch("aircontroler.factory.parse_manifest", return_value=nodes)
+    mocker.patch("aircontroler.factory.SelectorResolver.resolve", return_value=all_uids)
+    with DAG("test_dag_no_meta", schedule=None) as dag:
+        result = build_dbt_dag(
+            dag=dag,
+            manifest_path=str(tmp_path / "manifest.json"),
+            dbt_command="dbt build --select +mart",
+            project_dir=str(tmp_path),
+            profiles_path=str(tmp_path),
+        )
+    stg_a = result["tasks"]["model.fixture_project.stg_a"]
+    # stg_a has no meta.aircontroler in the fixture → BaseOperator defaults
+    assert stg_a.retries == 0
+
+
+def test_per_model_pool_overrides_dag_pool(mocker, manifest_with_meta_data, tmp_path):
+    """EXEC-01 D-16: per-model meta.aircontroler.pool overrides DAG-level pool param."""
+    from airflow.models import DAG
+    from aircontroler.factory import build_dbt_dag
+    nodes = _make_nodes(manifest_with_meta_data)
+    all_uids = {n.unique_id for n in nodes}
+    mocker.patch("aircontroler.factory.parse_manifest", return_value=nodes)
+    mocker.patch("aircontroler.factory.SelectorResolver.resolve", return_value=all_uids)
+    with DAG("test_dag_pool_override", schedule=None) as dag:
+        result = build_dbt_dag(
+            dag=dag,
+            manifest_path=str(tmp_path / "manifest.json"),
+            dbt_command="dbt build --select +mart",
+            project_dir=str(tmp_path),
+            profiles_path=str(tmp_path),
+            pool="dag_default_pool",
+        )
+    # mart has meta.aircontroler.pool=heavy_models → wins over dag_default_pool
+    assert result["tasks"]["model.fixture_project.mart"].pool == "heavy_models"
+    # stg_a has no meta.aircontroler → falls back to DAG-level pool
+    assert result["tasks"]["model.fixture_project.stg_a"].pool == "dag_default_pool"
+
+
+def test_dag_pool_applied_to_all(mocker, manifest_v11_data, tmp_path):
+    """EXEC-04 + EXEC-01: DAG-level pool applies to all tasks when no per-model overrides."""
+    from airflow.models import DAG
+    from aircontroler.factory import build_dbt_dag
+    nodes = _make_nodes(manifest_v11_data)
+    all_uids = {n.unique_id for n in nodes}
+    mocker.patch("aircontroler.factory.parse_manifest", return_value=nodes)
+    mocker.patch("aircontroler.factory.SelectorResolver.resolve", return_value=all_uids)
+    with DAG("test_dag_pool_all", schedule=None) as dag:
+        result = build_dbt_dag(
+            dag=dag,
+            manifest_path=str(tmp_path / "manifest.json"),
+            dbt_command="dbt build --select +mart",
+            project_dir=str(tmp_path),
+            profiles_path=str(tmp_path),
+            pool="dag_pool",
+        )
+    for task in result["tasks"].values():
+        assert task.pool == "dag_pool"
+
+
+def test_dag_pool_none_leaves_unset(mocker, manifest_v11_data, tmp_path):
+    """EXEC-04: pool=None (default) leaves tasks at BaseOperator default pool."""
+    from airflow.models import DAG
+    from aircontroler.factory import build_dbt_dag
+    nodes = _make_nodes(manifest_v11_data)
+    all_uids = {n.unique_id for n in nodes}
+    mocker.patch("aircontroler.factory.parse_manifest", return_value=nodes)
+    mocker.patch("aircontroler.factory.SelectorResolver.resolve", return_value=all_uids)
+    with DAG("test_dag_pool_unset", schedule=None) as dag:
+        result = build_dbt_dag(
+            dag=dag,
+            manifest_path=str(tmp_path / "manifest.json"),
+            dbt_command="dbt build --select +mart",
+            project_dir=str(tmp_path),
+            profiles_path=str(tmp_path),
+        )
+    # BaseOperator default for pool is "default_pool" string in modern Airflow.
+    # The key assertion: factory did NOT inject any custom pool.
+    for task in result["tasks"].values():
+        assert task.pool in ("default_pool", None)
+
+
+def test_pool_slots_applied_when_pool_set(mocker, manifest_with_meta_data, tmp_path):
+    """EXEC-04: pool_slots flows to tasks that have a pool; defaults to 1 for unpooled."""
+    from airflow.models import DAG
+    from aircontroler.factory import build_dbt_dag
+    nodes = _make_nodes(manifest_with_meta_data)
+    all_uids = {n.unique_id for n in nodes}
+    mocker.patch("aircontroler.factory.parse_manifest", return_value=nodes)
+    mocker.patch("aircontroler.factory.SelectorResolver.resolve", return_value=all_uids)
+    with DAG("test_dag_pool_slots", schedule=None) as dag:
+        result = build_dbt_dag(
+            dag=dag,
+            manifest_path=str(tmp_path / "manifest.json"),
+            dbt_command="dbt build --select +mart",
+            project_dir=str(tmp_path),
+            profiles_path=str(tmp_path),
+            pool="dag_pool",
+            pool_slots=4,
+        )
+    # All tasks get pool_slots=4 because they all have a pool (mart=heavy_models, others=dag_pool)
+    for task in result["tasks"].values():
+        assert task.pool_slots == 4
+
+
+def test_target_path_forwarded_to_all_tasks(mocker, manifest_v11_data, tmp_path):
+    """EXEC-01/EXEC-02: target_path on factory propagates to every operator instance."""
+    from airflow.models import DAG
+    from aircontroler.factory import build_dbt_dag
+    nodes = _make_nodes(manifest_v11_data)
+    all_uids = {n.unique_id for n in nodes}
+    mocker.patch("aircontroler.factory.parse_manifest", return_value=nodes)
+    mocker.patch("aircontroler.factory.SelectorResolver.resolve", return_value=all_uids)
+    with DAG("test_dag_target_path", schedule=None) as dag:
+        result = build_dbt_dag(
+            dag=dag,
+            manifest_path=str(tmp_path / "manifest.json"),
+            dbt_command="dbt build --select +mart",
+            project_dir=str(tmp_path),
+            profiles_path=str(tmp_path),
+            target_path="/custom/target",
+        )
+    for task in result["tasks"].values():
+        assert task.target_path == "/custom/target"
+
+
+def test_freshness_key_ignored(mocker, manifest_v11_data, tmp_path):
+    """EXEC-01 D-04: Unrecognized meta.aircontroler keys (e.g., 'freshness') are ignored."""
+    from airflow.models import DAG
+    from aircontroler.factory import build_dbt_dag
+    # Inject a fake meta.aircontroler.freshness on one node (Phase 3 reserves this key)
+    nodes = _make_nodes(manifest_v11_data)
+    nodes[0].config["meta"] = {"aircontroler": {"freshness": 24}}  # unknown key
+    all_uids = {n.unique_id for n in nodes}
+    mocker.patch("aircontroler.factory.parse_manifest", return_value=nodes)
+    mocker.patch("aircontroler.factory.SelectorResolver.resolve", return_value=all_uids)
+    # Should not raise — freshness is silently ignored
+    with DAG("test_dag_freshness_ignored", schedule=None) as dag:
+        result = build_dbt_dag(
+            dag=dag,
+            manifest_path=str(tmp_path / "manifest.json"),
+            dbt_command="dbt build --select +mart",
+            project_dir=str(tmp_path),
+            profiles_path=str(tmp_path),
+        )
+    # Task is created normally; no retries from the unknown key
+    target_uid = nodes[0].unique_id
+    assert target_uid in result["tasks"]
+    assert result["tasks"][target_uid].retries == 0
