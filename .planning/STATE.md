@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: "### Phase 1: Walking Skeleton"
 status: in-progress
-stopped_at: "Completed 02-02-PLAN.md (Wave 1: cardinality guard + max_active_tasks). 29 unit tests passing."
-last_updated: "2026-04-19T05:27:04Z"
+stopped_at: "Completed 02-03-PLAN.md (Wave 2: per-model meta overrides EXEC-01). 44 unit tests passing."
+last_updated: "2026-04-19T05:33:20Z"
 progress:
   total_phases: 5
   completed_phases: 1
   total_plans: 9
-  completed_plans: 7
-  percent: 78
+  completed_plans: 8
+  percent: 89
 ---
 
 # Project State
@@ -32,7 +32,7 @@ See: .planning/PROJECT.md (updated 2026-04-17)
 | Phase | Status | Plans | Progress |
 |-------|--------|-------|----------|
 | 1. Walking Skeleton | ✓ Complete | 5/5 | 100% |
-| 2. Execution Hardening | In progress | 2/4 | 50% |
+| 2. Execution Hardening | In progress | 3/4 | 75% |
 | 3. Freshness Policies | Not started | 0/0 | 0% |
 | 4. Cross-DAG Conflict Locking | Not started | 0/0 | 0% |
 | 5. Cloud Run + Distribution | Not started | 0/0 | 0% |
@@ -51,10 +51,13 @@ See: .planning/PROJECT.md (updated 2026-04-17)
 - Wave 1 (02-02): EXEC-03 cardinality guard uses strict > (not >=) so exactly-at-limit does not raise
 - Wave 1 (02-02): env var AIRCONTROLER_MAX_MODELS read via int() with no try/except — fail loud per spec
 - Wave 1 (02-02): dag.max_active_tasks assigned only when explicitly set; None preserves Airflow's default of 16
+- Wave 2 (02-03): Conditional kwargs injection pattern — only non-None values forwarded to BaseOperator; preserves retries=0/retry_delay=timedelta(300)/pool defaults when unset
+- Wave 2 (02-03): retry_delay int (seconds) converted to timedelta inside operator __init__ before BaseOperator injection (Pitfall 4 fix)
+- Wave 2 (02-03): pool_slots applied only when task_pool is truthy: pool_slots if task_pool else 1
 
 ## Session Continuity
 
 Last session: 2026-04-19
-Stopped at: Completed 02-02-PLAN.md (Wave 1: cardinality guard + max_active_tasks). 29 unit tests passing.
+Stopped at: Completed 02-03-PLAN.md (Wave 2: per-model meta overrides EXEC-01). 44 unit tests passing.
 
-- Next action: Execute 02-03-PLAN.md (Wave 2: per-model meta overrides — EXEC-01 + EXEC-02 run_results parsing)
+- Next action: Execute 02-04-PLAN.md (Wave 3: run_results.json parsing EXEC-02 — operator _log_run_results + integration test)

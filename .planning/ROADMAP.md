@@ -45,7 +45,7 @@ Plans:
 Plans:
 - [x] 02-01-PLAN.md — Wave 0: test fixtures (run_results_v6.json, manifest_v12_with_meta.json) + conftest fixtures
 - [x] 02-02-PLAN.md — Wave 1: cardinality guard (EXEC-03) + max_active_tasks (EXEC-04) in factory.py
-- [ ] 02-03-PLAN.md — Wave 2: per-model meta overrides (EXEC-01) — operator constructor expansion + factory meta extraction loop
+- [x] 02-03-PLAN.md — Wave 2: per-model meta overrides (EXEC-01) — operator constructor expansion + factory meta extraction loop
 - [ ] 02-04-PLAN.md — Wave 3: run_results.json parsing (EXEC-02) — operator _log_run_results + integration test
 
 ### Phase 3: Freshness Policies
@@ -85,7 +85,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Walking Skeleton | 5/5 | Complete | 2026-04-18 |
-| 2. Execution Hardening | 2/4 | In progress | - |
+| 2. Execution Hardening | 3/4 | In progress | - |
 | 3. Freshness Policies | 0/0 | Not started | - |
 | 4. Cross-DAG Conflict Locking | 0/0 | Not started | - |
 | 5. Cloud Run + Distribution | 0/0 | Not started | - |
@@ -129,4 +129,4 @@ Plans:
 - Duplicates: 0 ✓
 
 ---
-*Last updated: 2026-04-19 — 02-02 (Wave 1: cardinality guard + max_active_tasks) complete; Phase 2 at 2/4 plans.*
+*Last updated: 2026-04-19 — 02-03 (Wave 2: per-model meta overrides EXEC-01) complete; Phase 2 at 3/4 plans.*
