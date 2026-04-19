@@ -37,7 +37,7 @@ class DbtRunModelOperator(BaseOperator):
     """
 
     # Declare non-standard constructor args for Airflow template resolution
-    template_fields = ("unique_id", "project_dir", "profiles_path", "dbt_executable_path", "target_path")
+    template_fields = ("unique_id", "project_dir", "profiles_path", "dbt_executable_path", "target_path", "conflict_policy")
 
     def __init__(
         self,
@@ -52,6 +52,7 @@ class DbtRunModelOperator(BaseOperator):
         pool: str | None = None,
         freshness_hours: float | None = None,
         trigger_rule: str = "none_failed",
+        conflict_policy: str | None = None,
         **kwargs,
     ) -> None:
         from datetime import timedelta
@@ -83,19 +84,139 @@ class DbtRunModelOperator(BaseOperator):
             )
             freshness_hours = None
         self.freshness_hours = freshness_hours
+        # Phase 4 / LOCK-01 / D-02: conflict_policy=None means no locking (backward-compatible).
+        # Validate allowed values; log WARNING and treat unknown values as None.
+        if conflict_policy is not None and conflict_policy not in ("skip", "fail"):
+            self.log.warning(
+                "conflict_policy=%r is not 'skip' or 'fail' for %s — treating as None (no locking)",
+                conflict_policy, unique_id,
+            )
+            conflict_policy = None
+        self.conflict_policy = conflict_policy
 
     def execute(self, context: dict) -> None:
         """Run 'dbt build --select <unique_id>' as a subprocess.
 
-        Phase 3 (FRESH-03): before the subprocess, consult MetadataDBHook.get_last_run()
-        and raise AirflowSkipException if the model ran successfully within freshness_hours.
-        On success (returncode 0, after _log_run_results), call record_run() to persist state.
+        Phase 4 (LOCK-01 through LOCK-04): when conflict_policy is set, wraps
+        execution in a single-session advisory lock block.
+          Step 1 (micro-tx): upsert identity into lock_holders (committed before main session).
+          Step 2 (main session, held for full duration):
+            acquire advisory lock → freshness check → subprocess → record_run → commit.
+          finally: delete_lock_holder (own scoped=False micro-tx — safe after rollback).
 
-        Security note: cmd is always list[str]; no shell passthrough is used.
-        profiles_path is passed as a directory path flag; file contents are
-        never read by this method and never appear in logs.
+        Phase 3 (FRESH-03): when conflict_policy is None, preserves existing two-separate-
+        sessions pattern exactly (get_last_run and record_run each open their own session).
+
+        Security: cmd is always list[str]; no shell passthrough (T-01-03-01).
         """
-        # Phase 3: FRESH-03 freshness TTL check — before subprocess
+        if self.conflict_policy is not None:
+            # ── Phase 4: single-session conflict lock path ──────────────────────────
+            from datetime import datetime, timezone
+            from airflow.providers.common.compat.sdk import AirflowSkipException
+            from airflow.utils.session import create_session
+            from aircontroler.hooks.metadata_db import MetadataDBHook
+
+            hook = MetadataDBHook()
+
+            # D-11 Step 1: micro-transaction — commit identity BEFORE advisory lock.
+            # Row is visible to all other tasks immediately.
+            hook.upsert_lock_holder(
+                unique_id=self.unique_id,
+                dag_id=context["dag_run"].dag_id,
+                run_id=context["run_id"],
+            )
+
+            try:
+                with create_session() as session:
+                    # D-11 Step 2: main transaction — hold advisory lock for full duration.
+                    acquired = hook.acquire_lock(self.unique_id, session)
+                    if not acquired:
+                        holder = hook.get_lock_holder(self.unique_id, session)
+                        holder_info = (
+                            f"{holder.dag_id}/{holder.run_id}" if holder else "unknown"
+                        )
+                        msg = f"conflict: {self.unique_id} already locked by {holder_info}"
+                        if self.conflict_policy == "skip":
+                            self.log.info("Skipping due to conflict: %s", msg)
+                            raise AirflowSkipException(msg)
+                        else:  # fail
+                            raise AirflowException(msg)
+
+                    # Lock acquired — run freshness check within the same session.
+                    if self.freshness_hours is not None:
+                        try:
+                            last_run = hook.get_last_run(self.unique_id, session=session)
+                        except Exception as exc:
+                            self.log.warning(
+                                "Freshness check failed for %s: %s — running dbt (fail-open)",
+                                self.unique_id, exc,
+                            )
+                            last_run = None
+                        if last_run is not None:
+                            if last_run.tzinfo is None:
+                                last_run = last_run.replace(tzinfo=timezone.utc)
+                            now = datetime.now(tz=timezone.utc)
+                            elapsed_hours = (now - last_run).total_seconds() / 3600
+                            if elapsed_hours < self.freshness_hours:
+                                self.log.info(
+                                    "Skipping %s: last run %.2f hours ago (TTL: %.1f hours)",
+                                    self.unique_id, elapsed_hours, self.freshness_hours,
+                                )
+                                raise AirflowSkipException(
+                                    f"{self.unique_id} is fresh "
+                                    f"(last ran {elapsed_hours:.2f}h ago, TTL {self.freshness_hours}h)"
+                                )
+
+                    # Run dbt subprocess (same logic as Phase 3 path below).
+                    executable = self.dbt_executable_path or "dbt"
+                    cmd = [
+                        executable,
+                        "build",
+                        "--select", self.unique_id,
+                        "--project-dir", self.project_dir,
+                        "--profiles-dir", self.profiles_path,
+                    ]
+                    self.log.info("Running dbt: %s", " ".join(cmd))
+                    result = subprocess.run(
+                        cmd,
+                        capture_output=True,
+                        text=True,
+                        check=False,
+                    )
+                    if result.returncode != 0:
+                        if result.stdout:
+                            self.log.error("dbt stdout:\n%s", result.stdout)
+                        self.log.error("dbt stderr:\n%s", result.stderr)
+                        raise AirflowException(
+                            f"dbt build failed for {self.unique_id!r} "
+                            f"(exit {result.returncode})"
+                        )
+                    if result.stdout:
+                        self.log.info(result.stdout)
+                    self._log_run_results()
+
+                    # Record run within the same session (commits on session __exit__).
+                    try:
+                        hook.record_run(
+                            unique_id=self.unique_id,
+                            dag_id=context["dag_run"].dag_id,
+                            run_id=context["run_id"],
+                            session=session,
+                        )
+                    except Exception as exc:
+                        self.log.warning(
+                            "record_run failed for %s: %s — state table not updated",
+                            self.unique_id, exc,
+                        )
+            finally:
+                # D-12 / T-4-04: always delete lock_holder row on any exit path.
+                # delete_lock_holder uses create_session(scoped=False) — independent of
+                # any rolled-back main session.
+                hook.delete_lock_holder(self.unique_id)
+            return
+
+        # ── Phase 3 path (conflict_policy=None): two-separate-sessions preserved ──
+        # D-07: no regression for existing callers.
         if self.freshness_hours is not None:
             from datetime import datetime, timezone
             from aircontroler.hooks.metadata_db import MetadataDBHook
@@ -128,7 +249,6 @@ class DbtRunModelOperator(BaseOperator):
                         f"(last ran {elapsed_hours:.2f}h ago, TTL {self.freshness_hours}h)"
                     )
 
-        # Existing Phase 1 / 2 subprocess logic — unchanged structure
         executable = self.dbt_executable_path or "dbt"
         cmd = [
             executable,
@@ -137,7 +257,6 @@ class DbtRunModelOperator(BaseOperator):
             "--project-dir", self.project_dir,
             "--profiles-dir", self.profiles_path,
         ]
-        # Log the command for auditability (path only, not credentials)
         self.log.info("Running dbt: %s", " ".join(cmd))
         result = subprocess.run(
             cmd,
@@ -153,7 +272,6 @@ class DbtRunModelOperator(BaseOperator):
                 f"dbt build failed for {self.unique_id!r} "
                 f"(exit {result.returncode})"
             )
-        # Success: log stdout once at INFO.
         if result.stdout:
             self.log.info(result.stdout)
         self._log_run_results()

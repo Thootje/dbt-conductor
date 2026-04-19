@@ -48,6 +48,7 @@ def build_dbt_dag(
     pool_slots: int = 1,
     target_path: str | None = None,
     trigger_rule: str = "none_failed",
+    conflict_policy: str | None = None,
 ) -> dict:
     """Render a dbt project as an Airflow DAG with one task per resolved model.
 
@@ -146,6 +147,8 @@ def build_dbt_dag(
         task_pool = ac_meta.get("pool") or pool or None
         # D-03: per-model trigger_rule overrides DAG-level (same `or` short-circuit as pool).
         task_trigger_rule = ac_meta.get("trigger_rule") or trigger_rule
+        # LOCK-01 / D-01: per-model conflict_policy overrides DAG-level.
+        task_conflict_policy = ac_meta.get("conflict_policy") or conflict_policy
         tasks[uid] = DbtRunModelOperator(
             task_id=uid,
             dag=dag,
@@ -160,6 +163,7 @@ def build_dbt_dag(
             pool_slots=pool_slots if task_pool else 1,
             freshness_hours=ac_meta.get("freshness_hours"),   # D-10 / FRESH-01
             trigger_rule=task_trigger_rule,                    # D-02 / D-03
+            conflict_policy=task_conflict_policy,
         )
 
     # --- Parse-time step 5: Wire edges from manifest depends_on ---
