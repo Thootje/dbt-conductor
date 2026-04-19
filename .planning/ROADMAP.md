@@ -8,7 +8,7 @@
 
 - [x] **Phase 1: Walking Skeleton** - User can render a dbt project as a per-model Airflow DAG running on Composer + BigQuery
 - [x] **Phase 2: Execution Hardening** - User gets production-grade per-task overrides, structured run results, and parse-time safety guards
-- [ ] **Phase 3: Freshness Policies** - User can define time-based TTLs that skip already-fresh models across DAGs (D1 differentiator)
+- [x] **Phase 3: Freshness Policies** - User can define time-based TTLs that skip already-fresh models across DAGs (D1 differentiator)
 - [ ] **Phase 4: Cross-DAG Conflict Locking** - User can configure skip/fail conflict policies that prevent concurrent DAGs from double-running the same model (D2 differentiator)
 - [ ] **Phase 5: Cloud Run + Distribution** - User can deploy aircontroler on Cloud Run executor with per-model GCP service accounts
 
@@ -60,10 +60,10 @@ Plans:
 **Plans:** 4 plans
 
 Plans:
-- [ ] 03-01-PLAN.md — Wave 0: db_manager.py + Alembic migration + test fixtures & stubs (FRESH-04, FRESH-06)
-- [ ] 03-02-PLAN.md — Wave 1: MetadataDBHook full impl + operator freshness skip/record (FRESH-03, FRESH-04)
-- [ ] 03-03-PLAN.md — Wave 1: factory meta extraction + provider_info db-managers + `aircontroler db init` CLI (FRESH-01, FRESH-03, FRESH-06)
-- [ ] 03-04-PLAN.md — Wave 2: SQLite integration tests (round-trip + operator end-to-end) (FRESH-03, FRESH-04, FRESH-06)
+- [x] 03-01-PLAN.md — Wave 0: db_manager.py + Alembic migration + test fixtures & stubs (FRESH-04, FRESH-06)
+- [x] 03-02-PLAN.md — Wave 1: MetadataDBHook full impl + operator freshness skip/record (FRESH-03, FRESH-04)
+- [x] 03-03-PLAN.md — Wave 1: factory meta extraction + provider_info db-managers + `aircontroler db init` CLI (FRESH-01, FRESH-03, FRESH-06)
+- [x] 03-04-PLAN.md — Wave 2: SQLite integration tests (round-trip + operator end-to-end) (FRESH-03, FRESH-04, FRESH-06)
 
 ### Phase 4: Cross-DAG Conflict Locking
 **Goal:** User can configure conflict policies so that when multiple DAGs target the same model concurrently, only one runs and the others skip or fail deterministically — the second headline differentiator over Cosmos.
@@ -92,7 +92,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 1. Walking Skeleton | 5/5 | Complete | 2026-04-18 |
 | 2. Execution Hardening | 4/4 | Complete | 2026-04-19 |
-| 3. Freshness Policies | 0/4 | Planned | - |
+| 3. Freshness Policies | 4/4 | Complete | 2026-04-19 |
 | 4. Cross-DAG Conflict Locking | 0/0 | Not started | - |
 | 5. Cloud Run + Distribution | 0/0 | Not started | - |
 
