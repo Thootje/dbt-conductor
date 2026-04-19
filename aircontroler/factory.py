@@ -44,6 +44,9 @@ def build_dbt_dag(
     service_account: str | None = None,
     cardinality_limit: int | None = None,
     max_active_tasks: int | None = None,
+    pool: str | None = None,
+    pool_slots: int = 1,
+    target_path: str | None = None,
 ) -> dict:
     """Render a dbt project as an Airflow DAG with one task per resolved model.
 
@@ -129,6 +132,12 @@ def build_dbt_dag(
     # Never uses .expand() — preserves per-model graph wiring and lineage (D-06 key decision)
     tasks: dict[str, DbtRunModelOperator] = {}
     for uid, node in node_map.items():
+        # EXEC-01: per-model overrides from meta.aircontroler in schema.yml.
+        # Unrecognized keys (e.g., 'freshness' reserved for Phase 3) are
+        # silently ignored — only the known keys are extracted via .get().
+        ac_meta = node.config.get("meta", {}).get("aircontroler", {})
+        # D-16: per-model pool overrides DAG-level pool.
+        task_pool = ac_meta.get("pool") or pool or None
         tasks[uid] = DbtRunModelOperator(
             task_id=uid,
             dag=dag,
@@ -136,6 +145,11 @@ def build_dbt_dag(
             project_dir=project_dir,
             profiles_path=profiles_path,
             dbt_executable_path=executable,
+            target_path=target_path,
+            retries=ac_meta.get("retries"),
+            retry_delay=ac_meta.get("retry_delay"),
+            pool=task_pool,
+            pool_slots=pool_slots if task_pool else 1,
         )
 
     # --- Parse-time step 5: Wire edges from manifest depends_on ---
