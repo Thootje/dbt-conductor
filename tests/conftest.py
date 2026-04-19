@@ -55,3 +55,9 @@ def mock_context():
         "run_id": "test_run_id",
         "task_instance": MagicMock(),
     }
+
+
+@pytest.fixture
+def manifest_with_freshness_data() -> dict:
+    """Load v12 manifest fixture with meta.aircontroler.freshness_hours (FRESH-01)."""
+    return json.loads((FIXTURES_DIR / "manifest_v12_with_freshness.json").read_text())
