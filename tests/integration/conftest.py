@@ -40,8 +40,14 @@ def sqlite_airflow_db(tmp_path, monkeypatch):
     monkeypatch.setenv("AIRFLOW__CORE__SQL_ALCHEMY_CONN", db_url)
 
     # Reload airflow.settings so the new URL takes effect for subsequent create_session calls.
+    # Airflow 3.x stores Session in settings.Session (initially None); configure_vars() reads
+    # AIRFLOW__DATABASE__SQL_ALCHEMY_CONN and configure_orm() builds the scoped_session factory.
+    # A plain importlib.reload() does NOT call configure_vars/configure_orm — we must do so
+    # explicitly after the reload to populate settings.Session.
     import airflow.settings as airflow_settings
     importlib.reload(airflow_settings)
+    airflow_settings.configure_vars()
+    airflow_settings.configure_orm()
     import airflow.utils.session as airflow_session
     importlib.reload(airflow_session)
 
