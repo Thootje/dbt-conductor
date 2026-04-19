@@ -104,11 +104,16 @@ def build_dbt_dag(
 
     # EXEC-03: cardinality guard at DAG parse time.
     # Precedence: kwarg > env var > hardcoded default 800.
-    effective_limit: int = (
-        cardinality_limit
-        if cardinality_limit is not None
-        else int(os.environ.get("AIRCONTROLER_MAX_MODELS", 800))
-    )
+    try:
+        effective_limit: int = (
+            cardinality_limit
+            if cardinality_limit is not None
+            else int(os.environ.get("AIRCONTROLER_MAX_MODELS", 800))
+        )
+    except ValueError as exc:
+        raise ValueError(
+            f"AIRCONTROLER_MAX_MODELS env var is not a valid integer: {exc}"
+        ) from exc
     if len(resolved_ids) > effective_limit:
         raise ValueError(
             f"Selector resolved to {len(resolved_ids):,} models "
