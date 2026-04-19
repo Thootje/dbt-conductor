@@ -725,7 +725,6 @@ def _make_conflict_context():
     return ctx
 
 
-@pytest.mark.xfail(strict=False, reason="Wave 1 implementation pending")
 def test_conflict_policy_stored_on_operator():
     """LOCK-01: conflict_policy param is stored as self.conflict_policy."""
     from aircontroler.operator import DbtRunModelOperator
@@ -736,7 +735,6 @@ def test_conflict_policy_stored_on_operator():
     assert op.conflict_policy == "skip"
 
 
-@pytest.mark.xfail(strict=False, reason="Wave 1 implementation pending")
 def test_conflict_policy_none_by_default():
     """LOCK-01 / D-02: Default conflict_policy is None — no locking, backward-compatible."""
     from aircontroler.operator import DbtRunModelOperator
@@ -746,7 +744,6 @@ def test_conflict_policy_none_by_default():
     assert op.conflict_policy is None
 
 
-@pytest.mark.xfail(strict=False, reason="Wave 1 implementation pending")
 def test_conflict_skip_raises_airflow_skip_exception(mocker):
     """LOCK-03: acquire_lock returns False + conflict_policy=skip → AirflowSkipException."""
     from airflow.providers.common.compat.sdk import AirflowSkipException
@@ -767,7 +764,6 @@ def test_conflict_skip_raises_airflow_skip_exception(mocker):
     assert "model.proj.stg_a" in str(exc_info.value)
 
 
-@pytest.mark.xfail(strict=False, reason="Wave 1 implementation pending")
 def test_conflict_fail_raises_airflow_exception(mocker):
     """LOCK-04: acquire_lock returns False + conflict_policy=fail → AirflowException with holder info."""
     from airflow.exceptions import AirflowException
@@ -792,7 +788,6 @@ def test_conflict_fail_raises_airflow_exception(mocker):
     assert "model.proj.stg_a" in str(exc_info.value)
 
 
-@pytest.mark.xfail(strict=False, reason="Wave 1 implementation pending")
 def test_lock_acquired_before_freshness_check(mocker):
     """LOCK-02 / D-05: acquire_lock is called BEFORE get_last_run (call order)."""
     call_order = []
@@ -827,7 +822,6 @@ def test_lock_acquired_before_freshness_check(mocker):
     assert acquire_idx < freshness_idx, f"acquire must come before freshness: {call_order}"
 
 
-@pytest.mark.xfail(strict=False, reason="Wave 1 implementation pending")
 def test_finally_cleanup_on_success_path(mocker):
     """LOCK-04 / D-12: delete_lock_holder is called on the success path."""
     mock_delete = mocker.patch("aircontroler.hooks.metadata_db.MetadataDBHook.delete_lock_holder")
@@ -846,7 +840,6 @@ def test_finally_cleanup_on_success_path(mocker):
     assert mock_delete.call_count == 1
 
 
-@pytest.mark.xfail(strict=False, reason="Wave 1 implementation pending")
 def test_finally_cleanup_on_conflict_skip_path(mocker):
     """LOCK-04 / D-12: delete_lock_holder is called even when conflict raises AirflowSkipException."""
     from airflow.providers.common.compat.sdk import AirflowSkipException
@@ -864,7 +857,6 @@ def test_finally_cleanup_on_conflict_skip_path(mocker):
     assert mock_delete.call_count == 1
 
 
-@pytest.mark.xfail(strict=False, reason="Wave 1 implementation pending")
 def test_finally_cleanup_on_conflict_fail_path(mocker):
     """LOCK-04 / D-12: delete_lock_holder is called even when conflict raises AirflowException."""
     from airflow.exceptions import AirflowException

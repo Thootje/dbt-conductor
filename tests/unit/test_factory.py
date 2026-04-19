@@ -668,7 +668,6 @@ def test_freshness_with_meta_preserves_phase2_overrides(mocker, manifest_with_fr
 # ── Phase 4: LOCK-01 factory conflict_policy stubs ────────────────────────
 
 
-@pytest.mark.xfail(strict=False, reason="Wave 1 implementation pending")
 def test_dag_level_conflict_policy_forwarded_to_all_tasks(mocker, manifest_v11_data, tmp_path):
     """LOCK-01 / D-01: DAG-level conflict_policy forwarded to all DbtRunModelOperator instances."""
     from airflow.models import DAG
@@ -690,7 +689,6 @@ def test_dag_level_conflict_policy_forwarded_to_all_tasks(mocker, manifest_v11_d
         assert task.conflict_policy == "skip"
 
 
-@pytest.mark.xfail(strict=False, reason="Wave 1 implementation pending")
 def test_conflict_policy_none_means_no_locking(mocker, manifest_v11_data, tmp_path):
     """LOCK-01 / D-02: Default conflict_policy=None means no locking on any task."""
     from airflow.models import DAG
