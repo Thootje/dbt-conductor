@@ -663,3 +663,49 @@ def test_freshness_with_meta_preserves_phase2_overrides(mocker, manifest_with_fr
     assert mart.freshness_hours == 24
     assert mart.pool == "heavy_models"
     assert mart.retries == 3
+
+
+# ── Phase 4: LOCK-01 factory conflict_policy stubs ────────────────────────
+
+
+@pytest.mark.xfail(strict=False, reason="Wave 1 implementation pending")
+def test_dag_level_conflict_policy_forwarded_to_all_tasks(mocker, manifest_v11_data, tmp_path):
+    """LOCK-01 / D-01: DAG-level conflict_policy forwarded to all DbtRunModelOperator instances."""
+    from airflow.models import DAG
+    from aircontroler.factory import build_dbt_dag
+    nodes = _make_nodes(manifest_v11_data)
+    all_uids = {n.unique_id for n in nodes}
+    mocker.patch("aircontroler.factory.parse_manifest", return_value=nodes)
+    mocker.patch("aircontroler.factory.SelectorResolver.resolve", return_value=all_uids)
+    with DAG("test_dag_conflict", schedule=None) as dag:
+        result = build_dbt_dag(
+            dag=dag,
+            manifest_path=str(tmp_path / "manifest.json"),
+            dbt_command="dbt build --select +mart",
+            project_dir=str(tmp_path),
+            profiles_path=str(tmp_path),
+            conflict_policy="skip",
+        )
+    for task in result["tasks"].values():
+        assert task.conflict_policy == "skip"
+
+
+@pytest.mark.xfail(strict=False, reason="Wave 1 implementation pending")
+def test_conflict_policy_none_means_no_locking(mocker, manifest_v11_data, tmp_path):
+    """LOCK-01 / D-02: Default conflict_policy=None means no locking on any task."""
+    from airflow.models import DAG
+    from aircontroler.factory import build_dbt_dag
+    nodes = _make_nodes(manifest_v11_data)
+    all_uids = {n.unique_id for n in nodes}
+    mocker.patch("aircontroler.factory.parse_manifest", return_value=nodes)
+    mocker.patch("aircontroler.factory.SelectorResolver.resolve", return_value=all_uids)
+    with DAG("test_dag_no_lock", schedule=None) as dag:
+        result = build_dbt_dag(
+            dag=dag,
+            manifest_path=str(tmp_path / "manifest.json"),
+            dbt_command="dbt build --select +mart",
+            project_dir=str(tmp_path),
+            profiles_path=str(tmp_path),
+        )
+    for task in result["tasks"].values():
+        assert task.conflict_policy is None

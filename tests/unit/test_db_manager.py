@@ -10,9 +10,9 @@ def test_version_table_not_alembic_version():
 
 
 def test_revision_heads_map():
-    """FRESH-06: revision_heads_map maps package version to migration revision id."""
+    """FRESH-06 / LOCK-04: revision_heads_map maps package version to migration revision id."""
     from aircontroler.db_manager import AircontrolerDBManager
-    assert AircontrolerDBManager.revision_heads_map == {"1.0.0": "0001"}
+    assert AircontrolerDBManager.revision_heads_map == {"1.0.0": "0001", "1.1.0": "0002"}
 
 
 def test_model_runs_table_schema():

@@ -697,3 +697,186 @@ def test_naive_last_run_treated_as_utc(mocker):
     # Must NOT raise TypeError on comparison; must raise AirflowSkipException (fresh)
     with pytest.raises(AirflowSkipException):
         op.execute(_make_fresh_context())
+
+
+# ── Phase 4: LOCK-01 / LOCK-02 / LOCK-03 / LOCK-04 operator stubs ─────────
+
+
+def _make_conflict_op(conflict_policy: str):
+    """Helper: build a DbtRunModelOperator with conflict_policy set."""
+    from aircontroler.operator import DbtRunModelOperator
+    return DbtRunModelOperator(
+        task_id="model.proj.stg_a",
+        unique_id="model.proj.stg_a",
+        project_dir="/proj",
+        profiles_path="/profiles",
+        conflict_policy=conflict_policy,
+    )
+
+
+def _make_conflict_context():
+    """Helper: Airflow context with dag_run.dag_id and run_id for conflict tests."""
+    from unittest.mock import MagicMock
+    ctx: dict = {}
+    dag_run = MagicMock()
+    dag_run.dag_id = "test_dag"
+    ctx["dag_run"] = dag_run
+    ctx["run_id"] = "test_run_id"
+    return ctx
+
+
+@pytest.mark.xfail(strict=False, reason="Wave 1 implementation pending")
+def test_conflict_policy_stored_on_operator():
+    """LOCK-01: conflict_policy param is stored as self.conflict_policy."""
+    from aircontroler.operator import DbtRunModelOperator
+    op = DbtRunModelOperator(
+        task_id="t", unique_id="u", project_dir="/p", profiles_path="/pr",
+        conflict_policy="skip",
+    )
+    assert op.conflict_policy == "skip"
+
+
+@pytest.mark.xfail(strict=False, reason="Wave 1 implementation pending")
+def test_conflict_policy_none_by_default():
+    """LOCK-01 / D-02: Default conflict_policy is None — no locking, backward-compatible."""
+    from aircontroler.operator import DbtRunModelOperator
+    op = DbtRunModelOperator(
+        task_id="t", unique_id="u", project_dir="/p", profiles_path="/pr",
+    )
+    assert op.conflict_policy is None
+
+
+@pytest.mark.xfail(strict=False, reason="Wave 1 implementation pending")
+def test_conflict_skip_raises_airflow_skip_exception(mocker):
+    """LOCK-03: acquire_lock returns False + conflict_policy=skip → AirflowSkipException."""
+    from airflow.providers.common.compat.sdk import AirflowSkipException
+    op = _make_conflict_op("skip")
+    mocker.patch("aircontroler.hooks.metadata_db.MetadataDBHook.upsert_lock_holder")
+    mocker.patch("aircontroler.hooks.metadata_db.MetadataDBHook.acquire_lock", return_value=False)
+    mocker.patch(
+        "aircontroler.hooks.metadata_db.MetadataDBHook.get_lock_holder",
+        return_value=None,
+    )
+    mocker.patch("aircontroler.hooks.metadata_db.MetadataDBHook.delete_lock_holder")
+    mock_session_ctx = mocker.MagicMock()
+    mock_session_ctx.__enter__ = mocker.MagicMock(return_value=mocker.MagicMock())
+    mock_session_ctx.__exit__ = mocker.MagicMock(return_value=False)
+    mocker.patch("aircontroler.operator.create_session", return_value=mock_session_ctx)
+    with pytest.raises(AirflowSkipException) as exc_info:
+        op.execute(_make_conflict_context())
+    assert "model.proj.stg_a" in str(exc_info.value)
+
+
+@pytest.mark.xfail(strict=False, reason="Wave 1 implementation pending")
+def test_conflict_fail_raises_airflow_exception(mocker):
+    """LOCK-04: acquire_lock returns False + conflict_policy=fail → AirflowException with holder info."""
+    from airflow.exceptions import AirflowException
+    op = _make_conflict_op("fail")
+    fake_holder = mocker.MagicMock()
+    fake_holder.dag_id = "other_dag"
+    fake_holder.run_id = "other_run"
+    mocker.patch("aircontroler.hooks.metadata_db.MetadataDBHook.upsert_lock_holder")
+    mocker.patch("aircontroler.hooks.metadata_db.MetadataDBHook.acquire_lock", return_value=False)
+    mocker.patch(
+        "aircontroler.hooks.metadata_db.MetadataDBHook.get_lock_holder",
+        return_value=fake_holder,
+    )
+    mocker.patch("aircontroler.hooks.metadata_db.MetadataDBHook.delete_lock_holder")
+    mock_session_ctx = mocker.MagicMock()
+    mock_session_ctx.__enter__ = mocker.MagicMock(return_value=mocker.MagicMock())
+    mock_session_ctx.__exit__ = mocker.MagicMock(return_value=False)
+    mocker.patch("aircontroler.operator.create_session", return_value=mock_session_ctx)
+    with pytest.raises(AirflowException) as exc_info:
+        op.execute(_make_conflict_context())
+    assert "other_dag" in str(exc_info.value)
+    assert "model.proj.stg_a" in str(exc_info.value)
+
+
+@pytest.mark.xfail(strict=False, reason="Wave 1 implementation pending")
+def test_lock_acquired_before_freshness_check(mocker):
+    """LOCK-02 / D-05: acquire_lock is called BEFORE get_last_run (call order)."""
+    call_order = []
+    mocker.patch(
+        "aircontroler.hooks.metadata_db.MetadataDBHook.upsert_lock_holder",
+        side_effect=lambda **kw: call_order.append("upsert"),
+    )
+    mocker.patch(
+        "aircontroler.hooks.metadata_db.MetadataDBHook.acquire_lock",
+        side_effect=lambda *a, **kw: call_order.append("acquire") or True,
+    )
+    mocker.patch(
+        "aircontroler.hooks.metadata_db.MetadataDBHook.get_last_run",
+        side_effect=lambda *a, **kw: call_order.append("freshness") or None,
+    )
+    mocker.patch("aircontroler.hooks.metadata_db.MetadataDBHook.record_run")
+    mocker.patch("aircontroler.hooks.metadata_db.MetadataDBHook.delete_lock_holder")
+    mock_run = mocker.patch("aircontroler.operator.subprocess.run")
+    mock_run.return_value = mocker.MagicMock(returncode=0, stdout="", stderr="")
+    from aircontroler.operator import DbtRunModelOperator
+    op = DbtRunModelOperator(
+        task_id="t", unique_id="model.proj.stg_a", project_dir="/p",
+        profiles_path="/pr", conflict_policy="skip", freshness_hours=1.0,
+    )
+    mock_session_ctx = mocker.MagicMock()
+    mock_session_ctx.__enter__ = mocker.MagicMock(return_value=mocker.MagicMock())
+    mock_session_ctx.__exit__ = mocker.MagicMock(return_value=False)
+    mocker.patch("aircontroler.operator.create_session", return_value=mock_session_ctx)
+    op.execute(_make_conflict_context())
+    acquire_idx = call_order.index("acquire")
+    freshness_idx = call_order.index("freshness")
+    assert acquire_idx < freshness_idx, f"acquire must come before freshness: {call_order}"
+
+
+@pytest.mark.xfail(strict=False, reason="Wave 1 implementation pending")
+def test_finally_cleanup_on_success_path(mocker):
+    """LOCK-04 / D-12: delete_lock_holder is called on the success path."""
+    mock_delete = mocker.patch("aircontroler.hooks.metadata_db.MetadataDBHook.delete_lock_holder")
+    mocker.patch("aircontroler.hooks.metadata_db.MetadataDBHook.upsert_lock_holder")
+    mocker.patch("aircontroler.hooks.metadata_db.MetadataDBHook.acquire_lock", return_value=True)
+    mocker.patch("aircontroler.hooks.metadata_db.MetadataDBHook.get_last_run", return_value=None)
+    mocker.patch("aircontroler.hooks.metadata_db.MetadataDBHook.record_run")
+    mock_run = mocker.patch("aircontroler.operator.subprocess.run")
+    mock_run.return_value = mocker.MagicMock(returncode=0, stdout="", stderr="")
+    mock_session_ctx = mocker.MagicMock()
+    mock_session_ctx.__enter__ = mocker.MagicMock(return_value=mocker.MagicMock())
+    mock_session_ctx.__exit__ = mocker.MagicMock(return_value=False)
+    mocker.patch("aircontroler.operator.create_session", return_value=mock_session_ctx)
+    op = _make_conflict_op("skip")
+    op.execute(_make_conflict_context())
+    assert mock_delete.call_count == 1
+
+
+@pytest.mark.xfail(strict=False, reason="Wave 1 implementation pending")
+def test_finally_cleanup_on_conflict_skip_path(mocker):
+    """LOCK-04 / D-12: delete_lock_holder is called even when conflict raises AirflowSkipException."""
+    from airflow.providers.common.compat.sdk import AirflowSkipException
+    mock_delete = mocker.patch("aircontroler.hooks.metadata_db.MetadataDBHook.delete_lock_holder")
+    mocker.patch("aircontroler.hooks.metadata_db.MetadataDBHook.upsert_lock_holder")
+    mocker.patch("aircontroler.hooks.metadata_db.MetadataDBHook.acquire_lock", return_value=False)
+    mocker.patch("aircontroler.hooks.metadata_db.MetadataDBHook.get_lock_holder", return_value=None)
+    mock_session_ctx = mocker.MagicMock()
+    mock_session_ctx.__enter__ = mocker.MagicMock(return_value=mocker.MagicMock())
+    mock_session_ctx.__exit__ = mocker.MagicMock(return_value=False)
+    mocker.patch("aircontroler.operator.create_session", return_value=mock_session_ctx)
+    op = _make_conflict_op("skip")
+    with pytest.raises(AirflowSkipException):
+        op.execute(_make_conflict_context())
+    assert mock_delete.call_count == 1
+
+
+@pytest.mark.xfail(strict=False, reason="Wave 1 implementation pending")
+def test_finally_cleanup_on_conflict_fail_path(mocker):
+    """LOCK-04 / D-12: delete_lock_holder is called even when conflict raises AirflowException."""
+    from airflow.exceptions import AirflowException
+    mock_delete = mocker.patch("aircontroler.hooks.metadata_db.MetadataDBHook.delete_lock_holder")
+    mocker.patch("aircontroler.hooks.metadata_db.MetadataDBHook.upsert_lock_holder")
+    mocker.patch("aircontroler.hooks.metadata_db.MetadataDBHook.acquire_lock", return_value=False)
+    mocker.patch("aircontroler.hooks.metadata_db.MetadataDBHook.get_lock_holder", return_value=None)
+    mock_session_ctx = mocker.MagicMock()
+    mock_session_ctx.__enter__ = mocker.MagicMock(return_value=mocker.MagicMock())
+    mock_session_ctx.__exit__ = mocker.MagicMock(return_value=False)
+    mocker.patch("aircontroler.operator.create_session", return_value=mock_session_ctx)
+    op = _make_conflict_op("fail")
+    with pytest.raises(AirflowException):
+        op.execute(_make_conflict_context())
+    assert mock_delete.call_count == 1
