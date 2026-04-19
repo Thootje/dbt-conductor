@@ -32,7 +32,7 @@ class DbtRunModelOperator(BaseOperator):
     """
 
     # Declare non-standard constructor args for Airflow template resolution
-    template_fields = ("unique_id", "project_dir", "profiles_path", "dbt_executable_path")
+    template_fields = ("unique_id", "project_dir", "profiles_path", "dbt_executable_path", "target_path")
 
     def __init__(
         self,
@@ -41,13 +41,30 @@ class DbtRunModelOperator(BaseOperator):
         project_dir: str,
         profiles_path: str,
         dbt_executable_path: str = "dbt",
+        target_path: str | None = None,
+        retries: int | None = None,
+        retry_delay: int | None = None,
+        pool: str | None = None,
         **kwargs,
     ) -> None:
+        from datetime import timedelta
+        # Conditional injection: only pass non-None values to BaseOperator,
+        # so unset overrides fall back to BaseOperator defaults
+        # (retries=0, retry_delay=timedelta(seconds=300), pool=None).
+        # See RESEARCH.md Pitfall 3 (BaseOperator None semantics) and Pitfall 4
+        # (retry_delay int → timedelta conversion).
+        if retries is not None:
+            kwargs["retries"] = retries
+        if retry_delay is not None:
+            kwargs["retry_delay"] = timedelta(seconds=retry_delay)
+        if pool is not None:
+            kwargs["pool"] = pool
         super().__init__(**kwargs)
         self.unique_id = unique_id
         self.project_dir = project_dir
         self.profiles_path = profiles_path
         self.dbt_executable_path = dbt_executable_path
+        self.target_path = target_path
 
     def execute(self, context: dict) -> None:
         """Run 'dbt build --select <unique_id>' as a subprocess.
