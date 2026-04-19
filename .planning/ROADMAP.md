@@ -9,7 +9,7 @@
 - [x] **Phase 1: Walking Skeleton** - User can render a dbt project as a per-model Airflow DAG running on Composer + BigQuery
 - [x] **Phase 2: Execution Hardening** - User gets production-grade per-task overrides, structured run results, and parse-time safety guards
 - [x] **Phase 3: Freshness Policies** - User can define time-based TTLs that skip already-fresh models across DAGs (D1 differentiator)
-- [ ] **Phase 4: Cross-DAG Conflict Locking** - User can configure skip/fail conflict policies that prevent concurrent DAGs from double-running the same model (D2 differentiator)
+- [x] **Phase 4: Cross-DAG Conflict Locking** - User can configure skip/fail conflict policies that prevent concurrent DAGs from double-running the same model (D2 differentiator)
 - [ ] **Phase 5: Cloud Run + Distribution** - User can deploy aircontroler on Cloud Run executor with per-model GCP service accounts
 
 ## Milestone 1: v1.0
@@ -79,7 +79,7 @@ Plans:
 Plans:
 - [x] 04-01-PLAN.md — Wave 1: Alembic migration 0002 (lock_holders table) + db_manager extension + test stubs
 - [x] 04-02-PLAN.md — Wave 2: MetadataDBHook new methods + operator conflict block + factory param
-- [ ] 04-03-PLAN.md — Wave 3: Chaos test (LOCK-05) + activate stubs + full suite gate
+- [x] 04-03-PLAN.md — Wave 3: Chaos test (LOCK-05) + activate stubs + full suite gate
 
 ### Phase 5: Cloud Run + Distribution
 **Goal:** User can deploy aircontroler on Google Cloud Composer with the Cloud Run executor, using a per-model GCP service account for BigQuery access — completing the target deployment story.
@@ -98,7 +98,7 @@ Plans:
 | 1. Walking Skeleton | 5/5 | Complete | 2026-04-18 |
 | 2. Execution Hardening | 4/4 | Complete | 2026-04-19 |
 | 3. Freshness Policies | 4/4 | Complete | 2026-04-19 |
-| 4. Cross-DAG Conflict Locking | 2/3 | In progress | - |
+| 4. Cross-DAG Conflict Locking | 3/3 | Complete | 2026-04-19 |
 | 5. Cloud Run + Distribution | 0/0 | Not started | - |
 
 ## Traceability
@@ -124,11 +124,11 @@ Plans:
 | FRESH-04 | Phase 3 | Planned |
 | FRESH-05 | Phase 3 | Deferred (per D-11 — post-v1) |
 | FRESH-06 | Phase 3 | Planned |
-| LOCK-01 | Phase 4 | Implemented (04-02) |
-| LOCK-02 | Phase 4 | Implemented (04-02) |
-| LOCK-03 | Phase 4 | Implemented (04-02) |
-| LOCK-04 | Phase 4 | Implemented (04-02) |
-| LOCK-05 | Phase 4 | Implemented (04-02) |
+| LOCK-01 | Phase 4 | Complete |
+| LOCK-02 | Phase 4 | Complete |
+| LOCK-03 | Phase 4 | Complete |
+| LOCK-04 | Phase 4 | Complete |
+| LOCK-05 | Phase 4 | Complete |
 | CLOUD-01 | Phase 5 | Pending |
 | CLOUD-02 | Phase 5 | Pending |
 | CLOUD-03 | Phase 5 | Pending |
@@ -140,4 +140,4 @@ Plans:
 - Duplicates: 0 ✓
 
 ---
-*Last updated: 2026-04-19 — Phase 4 Plan 02 complete; LOCK-01 through LOCK-05 implemented. One plan remaining (04-03: activate stubs + chaos test).*
+*Last updated: 2026-04-19 — Phase 4 complete. LOCK-01 through LOCK-05 validated. 124 tests green, zero xfail. Next: Phase 5 Cloud Run + Distribution.*
