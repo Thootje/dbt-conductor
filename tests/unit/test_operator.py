@@ -196,3 +196,146 @@ def test_template_fields_includes_target_path(mocker):
     """EXEC-01: template_fields exposes target_path for Jinja templating."""
     from aircontroler.operator import DbtRunModelOperator
     assert "target_path" in DbtRunModelOperator.template_fields
+
+
+def test_run_results_logging(mocker, tmp_path, run_results_v6_data, caplog):
+    """EXEC-02: _log_run_results() finds matching unique_id and emits structured log."""
+    import json
+    import logging
+    from aircontroler.operator import DbtRunModelOperator
+    mock_run = mocker.patch("aircontroler.operator.subprocess.run")
+    mock_run.return_value = mocker.MagicMock(returncode=0, stdout="", stderr="")
+    target_dir = tmp_path / "target"
+    target_dir.mkdir()
+    (target_dir / "run_results.json").write_text(json.dumps(run_results_v6_data))
+    op = DbtRunModelOperator(
+        task_id="model.fixture_project.stg_a",
+        unique_id="model.fixture_project.stg_a",
+        project_dir=str(tmp_path),
+        profiles_path="/profiles",
+    )
+    with caplog.at_level(logging.INFO):
+        op.execute({})
+    info_messages = " ".join(r.message for r in caplog.records if r.levelno == logging.INFO)
+    assert "dbt result:" in info_messages
+    assert "unique_id=model.fixture_project.stg_a" in info_messages
+    assert "status=success" in info_messages
+    assert "execution_time=0.028s" in info_messages
+
+
+def test_run_results_no_match_warns(mocker, tmp_path, run_results_v6_data, caplog):
+    """EXEC-02: When unique_id is not in run_results.results[], a WARNING is logged (no crash)."""
+    import json
+    import logging
+    from aircontroler.operator import DbtRunModelOperator
+    mock_run = mocker.patch("aircontroler.operator.subprocess.run")
+    mock_run.return_value = mocker.MagicMock(returncode=0, stdout="", stderr="")
+    target_dir = tmp_path / "target"
+    target_dir.mkdir()
+    (target_dir / "run_results.json").write_text(json.dumps(run_results_v6_data))
+    op = DbtRunModelOperator(
+        task_id="model.proj.not_in_results",
+        unique_id="model.proj.not_in_results",  # not in fixture results
+        project_dir=str(tmp_path),
+        profiles_path="/profiles",
+    )
+    with caplog.at_level(logging.WARNING):
+        op.execute({})  # must not raise
+    warning_messages = " ".join(r.message for r in caplog.records if r.levelno == logging.WARNING)
+    assert "no entry for unique_id" in warning_messages
+
+
+def test_run_results_missing_file_warns(mocker, tmp_path, caplog):
+    """EXEC-02: When run_results.json does not exist, a WARNING is logged (no crash)."""
+    import logging
+    from aircontroler.operator import DbtRunModelOperator
+    mock_run = mocker.patch("aircontroler.operator.subprocess.run")
+    mock_run.return_value = mocker.MagicMock(returncode=0, stdout="", stderr="")
+    # Note: no target/ directory created → run_results.json absent
+    op = DbtRunModelOperator(
+        task_id="model.proj.stg_a",
+        unique_id="model.proj.stg_a",
+        project_dir=str(tmp_path),
+        profiles_path="/profiles",
+    )
+    with caplog.at_level(logging.WARNING):
+        op.execute({})  # must not raise
+    warning_messages = " ".join(r.message for r in caplog.records if r.levelno == logging.WARNING)
+    assert "run_results.json not found" in warning_messages
+
+
+def test_run_results_skipped_on_failure(mocker, tmp_path, caplog):
+    """EXEC-02 D-10: When subprocess returns non-zero, AirflowException is raised and run_results parsing is skipped."""
+    import logging
+    import pytest as _pytest
+    from airflow.exceptions import AirflowException
+    from aircontroler.operator import DbtRunModelOperator
+    mock_run = mocker.patch("aircontroler.operator.subprocess.run")
+    mock_run.return_value = mocker.MagicMock(returncode=1, stdout="boom", stderr="error")
+    op = DbtRunModelOperator(
+        task_id="model.proj.stg_a",
+        unique_id="model.proj.stg_a",
+        project_dir=str(tmp_path),
+        profiles_path="/profiles",
+    )
+    with caplog.at_level(logging.WARNING):
+        with _pytest.raises(AirflowException):
+            op.execute({})
+    # _log_run_results was NEVER called → no "run_results.json not found" warning
+    warning_messages = " ".join(r.message for r in caplog.records if r.levelno == logging.WARNING)
+    assert "run_results.json not found" not in warning_messages
+    assert "no entry for unique_id" not in warning_messages
+
+
+def test_target_path_controls_run_results_path(mocker, tmp_path):
+    """EXEC-02 D-07: target_path override determines run_results.json location."""
+    from pathlib import Path
+    from aircontroler.operator import DbtRunModelOperator
+    op = DbtRunModelOperator(
+        task_id="model.proj.stg_a",
+        unique_id="model.proj.stg_a",
+        project_dir=str(tmp_path),
+        profiles_path="/profiles",
+        target_path="/explicit/target",
+    )
+    assert op._run_results_path() == Path("/explicit/target") / "run_results.json"
+
+
+def test_default_run_results_path(mocker, tmp_path):
+    """EXEC-02 D-07: Default path is {project_dir}/target/run_results.json."""
+    from pathlib import Path
+    from aircontroler.operator import DbtRunModelOperator
+    op = DbtRunModelOperator(
+        task_id="model.proj.stg_a",
+        unique_id="model.proj.stg_a",
+        project_dir=str(tmp_path),
+        profiles_path="/profiles",
+    )
+    assert op._run_results_path() == Path(str(tmp_path)) / "target" / "run_results.json"
+
+
+def test_run_results_does_not_log_compiled_code_or_relation(mocker, tmp_path, run_results_v6_data, caplog):
+    """SECURITY T-2-01: compiled_code and relation_name MUST NOT appear in any log record."""
+    import json
+    import logging
+    from aircontroler.operator import DbtRunModelOperator
+    mock_run = mocker.patch("aircontroler.operator.subprocess.run")
+    mock_run.return_value = mocker.MagicMock(returncode=0, stdout="", stderr="")
+    target_dir = tmp_path / "target"
+    target_dir.mkdir()
+    (target_dir / "run_results.json").write_text(json.dumps(run_results_v6_data))
+    op = DbtRunModelOperator(
+        task_id="model.fixture_project.stg_a",
+        unique_id="model.fixture_project.stg_a",
+        project_dir=str(tmp_path),
+        profiles_path="/profiles",
+    )
+    with caplog.at_level(logging.DEBUG):
+        op.execute({})
+    all_messages = " ".join(r.getMessage() for r in caplog.records)
+    # Fixture's compiled_code is "select 1 as id, 'foo' as val"
+    assert "compiled_code" not in all_messages, f"Security violation T-2-01: compiled_code key logged. Messages: {all_messages}"
+    assert "select 1 as id" not in all_messages, f"Security violation T-2-01: SQL contents logged. Messages: {all_messages}"
+    assert "relation_name" not in all_messages, f"Security violation T-2-01: relation_name key logged. Messages: {all_messages}"
+    # Fixture's relation_name is "memory.main.stg_a" — verify the inner string isn't logged either
+    assert '"main"."stg_a"' not in all_messages, f"Security violation T-2-01: relation contents logged. Messages: {all_messages}"
