@@ -198,91 +198,126 @@ def test_template_fields_includes_target_path(mocker):
     assert "target_path" in DbtRunModelOperator.template_fields
 
 
-def test_run_results_logging(mocker, tmp_path, run_results_v6_data, caplog):
-    """EXEC-02: _log_run_results() finds matching unique_id and emits structured log."""
+def _make_mock_log(mocker):
+    """Create a MagicMock logger and patch DbtRunModelOperator.log property to return it.
+
+    Airflow 3 uses structlog (PrintLoggerFactory) rather than stdlib logging,
+    so pytest's caplog fixture cannot capture operator log calls. This helper
+    patches the 'log' property at the class level using mocker (auto-cleaned up
+    after each test) so we can assert on info/warning/error calls directly.
+
+    Returns the mock_log MagicMock instance. mocker handles teardown.
+    """
+    from aircontroler.operator import DbtRunModelOperator
+    mock_log = mocker.MagicMock()
+    mocker.patch.object(
+        DbtRunModelOperator, "log", new_callable=mocker.PropertyMock, return_value=mock_log
+    )
+    return mock_log
+
+
+def _format_log_calls(call_list):
+    """Reconstruct formatted log messages from a list of mock call objects.
+
+    Each call has positional args (fmt, *args); we apply %-formatting to
+    reproduce the final string that would have been emitted.
+    """
+    msgs = []
+    for call in call_list:
+        fmt = call.args[0] if call.args else ""
+        args = call.args[1:] if len(call.args) > 1 else ()
+        try:
+            msgs.append(str(fmt % args) if args else str(fmt))
+        except Exception:
+            msgs.append(str(fmt))
+    return msgs
+
+
+def test_run_results_logging(mocker, tmp_path, run_results_v6_data):
+    """EXEC-02: _log_run_results() finds matching unique_id and emits structured log.
+
+    Airflow 3 uses structlog (not stdlib logging), so caplog does not capture
+    operator log calls. We patch the 'log' property and assert on mock calls.
+    """
     import json
-    import logging
     from aircontroler.operator import DbtRunModelOperator
     mock_run = mocker.patch("aircontroler.operator.subprocess.run")
     mock_run.return_value = mocker.MagicMock(returncode=0, stdout="", stderr="")
     target_dir = tmp_path / "target"
     target_dir.mkdir()
     (target_dir / "run_results.json").write_text(json.dumps(run_results_v6_data))
+    mock_log = _make_mock_log(mocker)
     op = DbtRunModelOperator(
         task_id="model.fixture_project.stg_a",
         unique_id="model.fixture_project.stg_a",
         project_dir=str(tmp_path),
         profiles_path="/profiles",
     )
-    with caplog.at_level(logging.INFO):
-        op.execute({})
-    info_messages = " ".join(r.message for r in caplog.records if r.levelno == logging.INFO)
+    op.execute({})
+    info_messages = " ".join(_format_log_calls(mock_log.info.call_args_list))
     assert "dbt result:" in info_messages
     assert "unique_id=model.fixture_project.stg_a" in info_messages
     assert "status=success" in info_messages
     assert "execution_time=0.028s" in info_messages
 
 
-def test_run_results_no_match_warns(mocker, tmp_path, run_results_v6_data, caplog):
+def test_run_results_no_match_warns(mocker, tmp_path, run_results_v6_data):
     """EXEC-02: When unique_id is not in run_results.results[], a WARNING is logged (no crash)."""
     import json
-    import logging
     from aircontroler.operator import DbtRunModelOperator
     mock_run = mocker.patch("aircontroler.operator.subprocess.run")
     mock_run.return_value = mocker.MagicMock(returncode=0, stdout="", stderr="")
     target_dir = tmp_path / "target"
     target_dir.mkdir()
     (target_dir / "run_results.json").write_text(json.dumps(run_results_v6_data))
+    mock_log = _make_mock_log(mocker)
     op = DbtRunModelOperator(
         task_id="model.proj.not_in_results",
         unique_id="model.proj.not_in_results",  # not in fixture results
         project_dir=str(tmp_path),
         profiles_path="/profiles",
     )
-    with caplog.at_level(logging.WARNING):
-        op.execute({})  # must not raise
-    warning_messages = " ".join(r.message for r in caplog.records if r.levelno == logging.WARNING)
+    op.execute({})  # must not raise
+    warning_messages = " ".join(_format_log_calls(mock_log.warning.call_args_list))
     assert "no entry for unique_id" in warning_messages
 
 
-def test_run_results_missing_file_warns(mocker, tmp_path, caplog):
+def test_run_results_missing_file_warns(mocker, tmp_path):
     """EXEC-02: When run_results.json does not exist, a WARNING is logged (no crash)."""
-    import logging
     from aircontroler.operator import DbtRunModelOperator
     mock_run = mocker.patch("aircontroler.operator.subprocess.run")
     mock_run.return_value = mocker.MagicMock(returncode=0, stdout="", stderr="")
     # Note: no target/ directory created → run_results.json absent
+    mock_log = _make_mock_log(mocker)
     op = DbtRunModelOperator(
         task_id="model.proj.stg_a",
         unique_id="model.proj.stg_a",
         project_dir=str(tmp_path),
         profiles_path="/profiles",
     )
-    with caplog.at_level(logging.WARNING):
-        op.execute({})  # must not raise
-    warning_messages = " ".join(r.message for r in caplog.records if r.levelno == logging.WARNING)
+    op.execute({})  # must not raise
+    warning_messages = " ".join(_format_log_calls(mock_log.warning.call_args_list))
     assert "run_results.json not found" in warning_messages
 
 
-def test_run_results_skipped_on_failure(mocker, tmp_path, caplog):
+def test_run_results_skipped_on_failure(mocker, tmp_path):
     """EXEC-02 D-10: When subprocess returns non-zero, AirflowException is raised and run_results parsing is skipped."""
-    import logging
     import pytest as _pytest
     from airflow.exceptions import AirflowException
     from aircontroler.operator import DbtRunModelOperator
     mock_run = mocker.patch("aircontroler.operator.subprocess.run")
     mock_run.return_value = mocker.MagicMock(returncode=1, stdout="boom", stderr="error")
+    mock_log = _make_mock_log(mocker)
     op = DbtRunModelOperator(
         task_id="model.proj.stg_a",
         unique_id="model.proj.stg_a",
         project_dir=str(tmp_path),
         profiles_path="/profiles",
     )
-    with caplog.at_level(logging.WARNING):
-        with _pytest.raises(AirflowException):
-            op.execute({})
+    with _pytest.raises(AirflowException):
+        op.execute({})
     # _log_run_results was NEVER called → no "run_results.json not found" warning
-    warning_messages = " ".join(r.message for r in caplog.records if r.levelno == logging.WARNING)
+    warning_messages = " ".join(_format_log_calls(mock_log.warning.call_args_list))
     assert "run_results.json not found" not in warning_messages
     assert "no entry for unique_id" not in warning_messages
 
@@ -314,28 +349,36 @@ def test_default_run_results_path(mocker, tmp_path):
     assert op._run_results_path() == Path(str(tmp_path)) / "target" / "run_results.json"
 
 
-def test_run_results_does_not_log_compiled_code_or_relation(mocker, tmp_path, run_results_v6_data, caplog):
-    """SECURITY T-2-01: compiled_code and relation_name MUST NOT appear in any log record."""
+def test_run_results_does_not_log_compiled_code_or_relation(mocker, tmp_path, run_results_v6_data):
+    """SECURITY T-2-01: compiled_code and relation_name MUST NOT appear in any log record.
+
+    Airflow 3 uses structlog; we capture all calls to the mocked logger and
+    reconstruct the formatted message strings for the security assertion.
+    """
     import json
-    import logging
     from aircontroler.operator import DbtRunModelOperator
     mock_run = mocker.patch("aircontroler.operator.subprocess.run")
     mock_run.return_value = mocker.MagicMock(returncode=0, stdout="", stderr="")
     target_dir = tmp_path / "target"
     target_dir.mkdir()
     (target_dir / "run_results.json").write_text(json.dumps(run_results_v6_data))
+    mock_log = _make_mock_log(mocker)
     op = DbtRunModelOperator(
         task_id="model.fixture_project.stg_a",
         unique_id="model.fixture_project.stg_a",
         project_dir=str(tmp_path),
         profiles_path="/profiles",
     )
-    with caplog.at_level(logging.DEBUG):
-        op.execute({})
-    all_messages = " ".join(r.getMessage() for r in caplog.records)
+    op.execute({})
+    all_messages = " ".join(
+        _format_log_calls(mock_log.info.call_args_list)
+        + _format_log_calls(mock_log.warning.call_args_list)
+        + _format_log_calls(mock_log.debug.call_args_list)
+        + _format_log_calls(mock_log.error.call_args_list)
+    )
     # Fixture's compiled_code is "select 1 as id, 'foo' as val"
     assert "compiled_code" not in all_messages, f"Security violation T-2-01: compiled_code key logged. Messages: {all_messages}"
     assert "select 1 as id" not in all_messages, f"Security violation T-2-01: SQL contents logged. Messages: {all_messages}"
     assert "relation_name" not in all_messages, f"Security violation T-2-01: relation_name key logged. Messages: {all_messages}"
-    # Fixture's relation_name is "memory.main.stg_a" — verify the inner string isn't logged either
+    # Fixture's relation_name is '"memory"."main"."stg_a"' — verify inner strings not logged
     assert '"main"."stg_a"' not in all_messages, f"Security violation T-2-01: relation contents logged. Messages: {all_messages}"

@@ -101,3 +101,55 @@ class DbtRunModelOperator(BaseOperator):
                 f"dbt build failed for {self.unique_id!r} "
                 f"(exit {result.returncode})"
             )
+        self._log_run_results()
+
+    def _run_results_path(self):
+        """Resolve the path to run_results.json based on target_path or project_dir."""
+        from pathlib import Path
+        if self.target_path:
+            return Path(self.target_path) / "run_results.json"
+        return Path(self.project_dir) / "target" / "run_results.json"
+
+    def _log_run_results(self) -> None:
+        """Parse and log run_results.json for this node. Called only on subprocess success.
+
+        Security constraint (T-2-01): MUST NOT log `compiled_code` or `relation_name`.
+        Logs only `status`, `execution_time`, `adapter_response`, and `rows_affected`.
+        """
+        import json
+        rr_path = self._run_results_path()
+        if not rr_path.exists():
+            self.log.warning(
+                "run_results.json not found at %s — skipping structured logging",
+                rr_path,
+            )
+            return
+        try:
+            with open(rr_path) as fh:
+                data = json.load(fh)
+        except (OSError, json.JSONDecodeError) as exc:
+            self.log.warning("Failed to read run_results.json: %s", exc)
+            return
+        results = data.get("results", [])
+        node_result = next(
+            (r for r in results if r.get("unique_id") == self.unique_id),
+            None,
+        )
+        if node_result is None:
+            self.log.warning(
+                "run_results.json contained no entry for unique_id=%r — "
+                "model may have been skipped",
+                self.unique_id,
+            )
+            return
+        adapter_response = node_result.get("adapter_response", {})
+        rows_affected = adapter_response.get("rows_affected")
+        self.log.info(
+            "dbt result: unique_id=%s status=%s execution_time=%.3fs",
+            self.unique_id,
+            node_result.get("status", "unknown"),
+            node_result.get("execution_time", 0.0),
+        )
+        if rows_affected is not None:
+            self.log.info("dbt result: rows_affected=%s", rows_affected)
+        self.log.info("dbt result: adapter_response=%s", adapter_response)
