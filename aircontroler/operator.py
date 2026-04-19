@@ -15,6 +15,11 @@ import subprocess
 from airflow.exceptions import AirflowException
 from airflow.providers.common.compat.sdk import BaseOperator
 
+# Allowlist of adapter_response keys that are safe to emit in logs (T-2-01).
+# Fields like 'table_id', 'schema', or 'relation_name' are intentionally excluded
+# because they may expose fully-qualified relation references.
+_SAFE_ADAPTER_KEYS = frozenset({"_message", "rows_affected", "bytes_processed", "slot_ms", "cache_hit"})
+
 
 class DbtRunModelOperator(BaseOperator):
     """Airflow operator that runs 'dbt build --select <unique_id>' as a subprocess.
@@ -154,4 +159,5 @@ class DbtRunModelOperator(BaseOperator):
         )
         if rows_affected is not None:
             self.log.info("dbt result: rows_affected=%s", rows_affected)
-        self.log.info("dbt result: adapter_response=%s", adapter_response)
+        safe_adapter_fields = {k: v for k, v in adapter_response.items() if k in _SAFE_ADAPTER_KEYS}
+        self.log.info("dbt result: adapter_response=%s", safe_adapter_fields)
