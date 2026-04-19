@@ -77,7 +77,7 @@ Plans:
 **Plans:** 3 plans
 
 Plans:
-- [ ] 04-01-PLAN.md — Wave 1: Alembic migration 0002 (lock_holders table) + db_manager extension + test stubs
+- [x] 04-01-PLAN.md — Wave 1: Alembic migration 0002 (lock_holders table) + db_manager extension + test stubs
 - [ ] 04-02-PLAN.md — Wave 2: MetadataDBHook new methods + operator conflict block + factory param
 - [ ] 04-03-PLAN.md — Wave 3: Chaos test (LOCK-05) + activate stubs + full suite gate
 
@@ -98,7 +98,7 @@ Plans:
 | 1. Walking Skeleton | 5/5 | Complete | 2026-04-18 |
 | 2. Execution Hardening | 4/4 | Complete | 2026-04-19 |
 | 3. Freshness Policies | 4/4 | Complete | 2026-04-19 |
-| 4. Cross-DAG Conflict Locking | 0/3 | Ready to execute | - |
+| 4. Cross-DAG Conflict Locking | 1/3 | In progress | - |
 | 5. Cloud Run + Distribution | 0/0 | Not started | - |
 
 ## Traceability

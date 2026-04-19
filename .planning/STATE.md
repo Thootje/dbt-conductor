@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: "### Phase 1: Walking Skeleton"
 status: in-progress
-stopped_at: "Phase 4 planned (3 plans across 3 waves). Ready to execute."
-last_updated: "2026-04-19T20:00:00Z"
+stopped_at: "Phase 4 Plan 01 complete. Wave 0 foundation: migration 0002 + test stubs."
+last_updated: "2026-04-19T10:22:04Z"
 progress:
   total_phases: 5
   completed_phases: 3
   total_plans: 16
-  completed_plans: 13
-  percent: 81
+  completed_plans: 14
+  percent: 88
 ---
 
 # Project State
@@ -34,7 +34,7 @@ See: .planning/PROJECT.md (updated 2026-04-17)
 | 1. Walking Skeleton | ✓ Complete | 5/5 | 100% |
 | 2. Execution Hardening | ✓ Complete | 4/4 | 100% |
 | 3. Freshness Policies | ✓ Complete | 4/4 | 100% |
-| 4. Cross-DAG Conflict Locking | ◆ Planned | 0/3 | 0% |
+| 4. Cross-DAG Conflict Locking | ◆ In Progress | 1/3 | 33% |
 | 5. Cloud Run + Distribution | Not started | 0/0 | 0% |
 
 ## Notes
@@ -57,10 +57,13 @@ See: .planning/PROJECT.md (updated 2026-04-17)
 - Wave 3 (02-04): Airflow 3 uses structlog (PrintLoggerFactory) not stdlib logging — test log capture requires PropertyMock patch on DbtRunModelOperator.log, not pytest caplog
 - Wave 3 (02-04): dbt 1.11 does not accept full unique_id format (model.fixture_project.stg_a) as --select selector; integration test calls _log_run_results() directly with real dbt-written run_results.json
 - Wave 3 (02-04): Security T-2-01 enforced at source (no code path logs compiled_code/relation_name), unit (security regression test), and integration (real dbt output) levels
+- Wave 0 (04-01): lock_holders_table uses unique_id as direct VARCHAR(255) primary key (no surrogate id) — supports upsert semantics per D-10; no op.create_index needed (PK is already indexed)
+- Wave 0 (04-01): Migration 0002 chains off 0001 (down_revision='0001') forming a single linear revision head; revision_heads_map extended to include 1.1.0 -> 0002
+- Wave 0 (04-01): Rule 1 fix: test_db_manager.py revision_heads_map assertion updated from {"1.0.0": "0001"} to {"1.0.0": "0001", "1.1.0": "0002"} to match new correct value
 
 ## Session Continuity
 
 Last session: 2026-04-19
-Stopped at: Phase 4 planned (3 plans, 3 waves). Verification passed. Ready to execute.
+Stopped at: Phase 4 Plan 01 complete. Wave 0 foundation delivered. Ready to execute Plan 04-02.
 
-- Next action: Run /gsd:execute-phase 4 workspace/aircontroler (Cross-DAG Conflict Locking).
+- Next action: Execute Phase 4 Plan 02 (Wave 1: MetadataDBHook new methods + operator conflict block + factory param).
