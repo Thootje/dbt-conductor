@@ -105,3 +105,94 @@ def test_profiles_path(mocker):
     # Verify subprocess.run does not receive file contents via env or stdin
     call_kwargs = mock_run.call_args[1]
     assert "env" not in call_kwargs or call_kwargs.get("env") is None
+
+
+def test_retries_from_meta(mocker):
+    """EXEC-01: retries kwarg is forwarded to BaseOperator."""
+    from aircontroler.operator import DbtRunModelOperator
+    op = DbtRunModelOperator(
+        task_id="model.proj.mart",
+        unique_id="model.proj.mart",
+        project_dir="/proj",
+        profiles_path="/profiles",
+        retries=3,
+    )
+    assert op.retries == 3
+
+
+def test_retry_delay_conversion(mocker):
+    """EXEC-01: retry_delay int (seconds) is converted to timedelta on the operator."""
+    from datetime import timedelta
+    from aircontroler.operator import DbtRunModelOperator
+    op = DbtRunModelOperator(
+        task_id="model.proj.mart",
+        unique_id="model.proj.mart",
+        project_dir="/proj",
+        profiles_path="/profiles",
+        retry_delay=300,
+    )
+    assert op.retry_delay == timedelta(seconds=300)
+
+
+def test_pool_from_meta(mocker):
+    """EXEC-01: pool kwarg is forwarded to BaseOperator."""
+    from aircontroler.operator import DbtRunModelOperator
+    op = DbtRunModelOperator(
+        task_id="model.proj.mart",
+        unique_id="model.proj.mart",
+        project_dir="/proj",
+        profiles_path="/profiles",
+        pool="heavy_models",
+    )
+    assert op.pool == "heavy_models"
+
+
+def test_target_path_stored(mocker):
+    """EXEC-01: target_path kwarg is stored on the instance."""
+    from aircontroler.operator import DbtRunModelOperator
+    op = DbtRunModelOperator(
+        task_id="model.proj.stg_a",
+        unique_id="model.proj.stg_a",
+        project_dir="/proj",
+        profiles_path="/profiles",
+        target_path="/custom/target",
+    )
+    assert op.target_path == "/custom/target"
+
+
+def test_target_path_default_none(mocker):
+    """EXEC-01: target_path defaults to None when not passed."""
+    from aircontroler.operator import DbtRunModelOperator
+    op = DbtRunModelOperator(
+        task_id="model.proj.stg_a",
+        unique_id="model.proj.stg_a",
+        project_dir="/proj",
+        profiles_path="/profiles",
+    )
+    assert op.target_path is None
+
+
+def test_no_meta_uses_defaults(mocker):
+    """EXEC-01: With no retries/retry_delay/pool kwargs, BaseOperator defaults apply.
+
+    BaseOperator default retries is 0; default retry_delay is timedelta(seconds=300);
+    default pool is the string "default_pool" in modern Airflow (or None in some
+    versions). The key assertion is that we did NOT corrupt these by passing None
+    explicitly to BaseOperator (Pitfall 3). retries == 0 is the canonical proof.
+    """
+    from datetime import timedelta
+    from aircontroler.operator import DbtRunModelOperator
+    op = DbtRunModelOperator(
+        task_id="model.proj.stg_a",
+        unique_id="model.proj.stg_a",
+        project_dir="/proj",
+        profiles_path="/profiles",
+    )
+    assert op.retries == 0
+    assert op.retry_delay == timedelta(seconds=300)
+
+
+def test_template_fields_includes_target_path(mocker):
+    """EXEC-01: template_fields exposes target_path for Jinja templating."""
+    from aircontroler.operator import DbtRunModelOperator
+    assert "target_path" in DbtRunModelOperator.template_fields
