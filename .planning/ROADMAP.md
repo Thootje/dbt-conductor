@@ -74,7 +74,12 @@ Plans:
   2. With conflict policy `fail`, the losing task raises and marks itself failed with a clear "conflict: model X already locked by DAG Y" error.
   3. The locking path uses `pg_advisory_xact_lock(hashtext(unique_id))` acquired before the freshness check, released automatically at transaction end (verified by inspecting `pg_locks` during a held lock).
   4. When a task requires multiple locks (parent + child model), locks are acquired in sorted `unique_id` order — a deadlock-provocation test runs clean across 50 iterations.
-**Plans:** TBD
+**Plans:** 3 plans
+
+Plans:
+- [ ] 04-01-PLAN.md — Wave 1: Alembic migration 0002 (lock_holders table) + db_manager extension + test stubs
+- [ ] 04-02-PLAN.md — Wave 2: MetadataDBHook new methods + operator conflict block + factory param
+- [ ] 04-03-PLAN.md — Wave 3: Chaos test (LOCK-05) + activate stubs + full suite gate
 
 ### Phase 5: Cloud Run + Distribution
 **Goal:** User can deploy aircontroler on Google Cloud Composer with the Cloud Run executor, using a per-model GCP service account for BigQuery access — completing the target deployment story.
@@ -93,7 +98,7 @@ Plans:
 | 1. Walking Skeleton | 5/5 | Complete | 2026-04-18 |
 | 2. Execution Hardening | 4/4 | Complete | 2026-04-19 |
 | 3. Freshness Policies | 4/4 | Complete | 2026-04-19 |
-| 4. Cross-DAG Conflict Locking | 0/0 | Not started | - |
+| 4. Cross-DAG Conflict Locking | 0/3 | Ready to execute | - |
 | 5. Cloud Run + Distribution | 0/0 | Not started | - |
 
 ## Traceability

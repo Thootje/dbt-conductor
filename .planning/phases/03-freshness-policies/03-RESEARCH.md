@@ -571,17 +571,17 @@ mocker.patch.object(MetadataDBHook, "record_run")
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Should `record_run()` and `get_last_run()` share a single session in execute()?**
    - What we know: Both are in the same `execute()` call; they're semantically separate operations (read at start, write at end, with subprocess in between)
    - What's unclear: Whether a single session spanning the full `execute()` duration could hold locks or resources unnecessarily
-   - Recommendation: Use separate `create_session()` calls (D-09 shows them as independent methods). This is simplest and avoids holding a session across the subprocess.
+   - RESOLVED: Use separate `create_session()` calls (D-09 shows them as independent methods). This is simplest and avoids holding a session across the subprocess.
 
 2. **Does `get_last_run()` need to handle missing table gracefully (fail-open)?**
    - What we know: If `aircontroler db init` has not been run on Airflow 2.x, the table won't exist. The query will fail with a DB error.
    - What's unclear: Is fail-open (log warning, run dbt) or fail-closed (raise, block execution) the right behavior?
-   - Recommendation: Fail-open — catch DB errors in `get_last_run()` and return `None`. This means dbt runs if the table doesn't exist, preserving backward compatibility. Log at WARNING level.
+   - RESOLVED: Fail-open — catch DB errors in `get_last_run()` and return `None`. This means dbt runs if the table doesn't exist, preserving backward compatibility. Log at WARNING level.
 
 ---
 
