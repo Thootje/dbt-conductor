@@ -91,3 +91,19 @@ validated: 2026-04-19
 
 **Approval:** validated by Nyquist auditor 2026-04-19
 **Suite result:** 124 passed, 0 xfailed, 0 failures (25.31s)
+
+---
+
+## Validation Audit 2026-04-20
+
+| Metric | Count |
+|--------|-------|
+| Gaps found | 1 |
+| Resolved | 1 |
+| Escalated | 0 |
+
+**Finding:** `test_lock_chaos.py` used `concurrent.futures.ThreadPoolExecutor` with real threads and 8 nested `patch()` contexts per worker. `unittest.mock` patches are not thread-local — concurrent teardown leaked mock state into `test_metadata_db_hook.py` causing 4 failures when run as part of the full suite. Also caused full-suite runtime regression (~25s → stalled).
+
+**Fix:** Replaced real thread parallelism with sequential deterministic execution. Two workers run one after the other with `acquire_lock` returning `True`/`False` via `return_value` (not `side_effect`). Same 50-iteration count and assertions preserved. LOCK-05 coverage intact.
+
+**Unit suite post-fix:** 108 passed, 0 failures, 2.83s
