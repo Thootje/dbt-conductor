@@ -14,6 +14,11 @@ import subprocess
 
 from airflow.exceptions import AirflowException
 from airflow.providers.common.compat.sdk import BaseOperator
+
+try:
+    from airflow.providers.common.compat.sdk import AirflowSkipException
+except ImportError:
+    from airflow.exceptions import AirflowSkipException
 from airflow.utils.session import create_session
 
 # Allowlist of adapter_response keys that are safe to emit in logs (T-2-01).
@@ -113,7 +118,6 @@ class DbtRunModelOperator(BaseOperator):
         if self.conflict_policy is not None:
             # ── Phase 4: single-session conflict lock path ──────────────────────────
             from datetime import datetime, timezone
-            from airflow.providers.common.compat.sdk import AirflowSkipException
             from aircontroler.hooks.metadata_db import MetadataDBHook
 
             hook = MetadataDBHook()
@@ -220,7 +224,6 @@ class DbtRunModelOperator(BaseOperator):
         if self.freshness_hours is not None:
             from datetime import datetime, timezone
             from aircontroler.hooks.metadata_db import MetadataDBHook
-            from airflow.providers.common.compat.sdk import AirflowSkipException
             hook = MetadataDBHook()
             try:
                 last_run = hook.get_last_run(self.unique_id)

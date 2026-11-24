@@ -10,7 +10,9 @@
 - [x] **Phase 2: Execution Hardening** - User gets production-grade per-task overrides, structured run results, and parse-time safety guards
 - [x] **Phase 3: Freshness Policies** - User can define time-based TTLs that skip already-fresh models across DAGs (D1 differentiator)
 - [x] **Phase 4: Cross-DAG Conflict Locking** - User can configure skip/fail conflict policies that prevent concurrent DAGs from double-running the same model (D2 differentiator)
-- [ ] **Phase 5: Cloud Run + Distribution** - User can deploy aircontroler on Cloud Run executor with per-model GCP service accounts
+- [ ] **Phase 5: Rename project to dbt-conductor** - Rename the project from aircontroler to dbt-conductor
+- [ ] **Phase 6: Add proper CI setup** - Add proper CI setup
+- [ ] **Phase 7: Cloud Run + Distribution** - User can deploy dbt-conductor on Cloud Run executor with per-model GCP service accounts
 
 ## Milestone 1: v1.0
 
@@ -81,13 +83,23 @@ Plans:
 - [x] 04-02-PLAN.md — Wave 2: MetadataDBHook new methods + operator conflict block + factory param
 - [x] 04-03-PLAN.md — Wave 3: Chaos test (LOCK-05) + activate stubs + full suite gate
 
-### Phase 5: Cloud Run + Distribution
-**Goal:** User can deploy aircontroler on Google Cloud Composer with the Cloud Run executor, using a per-model GCP service account for BigQuery access — completing the target deployment story.
+### Phase 5: Rename project to dbt-conductor
+**Goal:** Rename the project from aircontroler to dbt-conductor
 **Depends on:** Phase 4
+**Plans:** TBD
+
+### Phase 6: Add proper CI setup
+**Goal:** Add proper CI setup
+**Depends on:** Phase 5
+**Plans:** TBD
+
+### Phase 7: Cloud Run + Distribution
+**Goal:** User can deploy dbt-conductor on Google Cloud Composer with the Cloud Run executor, using a per-model GCP service account for BigQuery access — completing the target deployment story.
+**Depends on:** Phase 6
 **Requirements:** CLOUD-01, CLOUD-02, CLOUD-03
 **Success Criteria** (what must be TRUE):
   1. User builds the reference Dockerfile (shipped in the repo) and gets a container image with the dbt project and `profiles.yml` baked in, runnable by the Cloud Run executor end-to-end on a sample DAG.
-  2. User sets `meta.aircontroler.service_account: svc-x@project.iam.gserviceaccount.com` in `schema.yml` (or overrides in Python) and the corresponding model task runs under that identity — verified by a BigQuery audit log showing the impersonated principal.
+  2. User sets `meta.dbt_conductor.service_account: svc-x@project.iam.gserviceaccount.com` in `schema.yml` (or overrides in Python) and the corresponding model task runs under that identity — verified by a BigQuery audit log showing the impersonated principal.
   3. When `service_account` is set, the dbt subprocess acquires credentials via Workload Identity Federation + ADC impersonation — no long-lived key files on disk.
 **Plans:** TBD
 
@@ -99,7 +111,9 @@ Plans:
 | 2. Execution Hardening | 4/4 | Complete | 2026-04-19 |
 | 3. Freshness Policies | 4/4 | Complete | 2026-04-19 |
 | 4. Cross-DAG Conflict Locking | 3/3 | Complete | 2026-04-19 |
-| 5. Cloud Run + Distribution | 0/0 | Not started | - |
+| 5. Rename project to dbt-conductor | 0/0 | Not started | - |
+| 6. Add proper CI setup | 0/0 | Not started | - |
+| 7. Cloud Run + Distribution | 0/0 | Not started | - |
 
 ## Traceability
 
@@ -129,9 +143,9 @@ Plans:
 | LOCK-03 | Phase 4 | Complete |
 | LOCK-04 | Phase 4 | Complete |
 | LOCK-05 | Phase 4 | Complete |
-| CLOUD-01 | Phase 5 | Pending |
-| CLOUD-02 | Phase 5 | Pending |
-| CLOUD-03 | Phase 5 | Pending |
+| CLOUD-01 | Phase 7 | Pending |
+| CLOUD-02 | Phase 7 | Pending |
+| CLOUD-03 | Phase 7 | Pending |
 
 **Coverage:**
 - v1 requirements: 26 total (24 planned for v1 + 2 deferred post-v1 per D-11)

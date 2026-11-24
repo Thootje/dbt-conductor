@@ -35,7 +35,9 @@ See: .planning/PROJECT.md (updated 2026-04-17)
 | 2. Execution Hardening | ✓ Complete | 4/4 | 100% |
 | 3. Freshness Policies | ✓ Complete | 4/4 | 100% |
 | 4. Cross-DAG Conflict Locking | ✓ Complete | 3/3 | 100% |
-| 5. Cloud Run + Distribution | Not started | 0/0 | 0% |
+| 5. Rename project to dbt-conductor | Not started | 0/0 | 0% |
+| 6. Add proper CI setup | Not started | 0/0 | 0% |
+| 7. Cloud Run + Distribution | Not started | 0/0 | 0% |
 
 ## Notes
 
@@ -66,6 +68,14 @@ See: .planning/PROJECT.md (updated 2026-04-17)
 - Wave 1 (04-02): upsert_lock_holder SQLite fallback: DELETE + INSERT (SQLAlchemy Core lacks cross-dialect ON CONFLICT DO UPDATE for non-Postgres)
 - Wave 2 (04-03): Promoted create_session to module-level import in operator.py — required for mocker.patch("aircontroler.operator.create_session") patch target to resolve correctly
 - Wave 2 (04-03): test_upsert_lock_holder_writes_row sets postgresql dialect on mock_session — SQLite fallback executes DELETE+INSERT (2 calls) but pg_insert ON CONFLICT path executes once; test exercises the pg path
+
+## Accumulated Context
+
+### Roadmap Evolution
+
+- Phase 6 added: Add proper CI setup
+- Phase 7 added: Rename the project from aircontroler to dbt-conductor
+- Phases 5-7 reordered: Rename (5) → CI (6) → Cloud Run (7) to avoid rework
 
 ## Session Continuity
 

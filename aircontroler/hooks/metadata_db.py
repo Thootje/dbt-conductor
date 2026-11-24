@@ -12,9 +12,20 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+import inspect
+
 import sqlalchemy as sa
 from airflow.hooks.base import BaseHook
 from airflow.utils.session import create_session
+
+_CREATE_SESSION_SUPPORTS_SCOPED = "scoped" in inspect.signature(create_session).parameters
+
+
+def _unscoped_session():
+    """create_session(scoped=False) on Airflow 3+, plain create_session() on 2.x."""
+    if _CREATE_SESSION_SUPPORTS_SCOPED:
+        return create_session(scoped=False)
+    return create_session()
 
 
 class MetadataDBHook(BaseHook):
@@ -118,7 +129,7 @@ class MetadataDBHook(BaseHook):
         """
         from aircontroler.db_manager import lock_holders_table
         locked_at = datetime.now(tz=timezone.utc)
-        with create_session(scoped=False) as session:
+        with _unscoped_session() as session:
             dialect = session.get_bind().dialect.name
             if dialect == "postgresql":
                 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -161,7 +172,7 @@ class MetadataDBHook(BaseHook):
         even if the main session has already been rolled back.
         """
         from aircontroler.db_manager import lock_holders_table
-        with create_session(scoped=False) as session:
+        with _unscoped_session() as session:
             session.execute(
                 sa.delete(lock_holders_table).where(
                     lock_holders_table.c.unique_id == unique_id

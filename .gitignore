@@ -32,3 +32,6 @@ logs/
 
 # uv lock file (managed separately)
 # uv.lock is intentionally tracked for reproducible CI
+
+# Devcontainer secrets
+.devcontainer/.env
